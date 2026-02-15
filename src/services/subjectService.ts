@@ -22,6 +22,11 @@ export const subjectService = {
         return response.data;
     },
 
+    getSubjectById: async (id: number): Promise<Subject> => {
+        const response = await api.get<Subject>(`/subject/${id}`);
+        return response.data;
+    },
+
     createSubject: async (data: { name: string }) => {
         const response = await api.post('/subject/', data);
         return response.data;

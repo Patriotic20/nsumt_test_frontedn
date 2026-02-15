@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { quizService, type Quiz, type QuizCreateRequest } from '@/services/quizService';
-import { subjectService, type Subject } from '@/services/subjectService';
-import { groupService, type Group } from '@/services/groupService';
-import { userService } from '@/services/userService';
+import { useState, useEffect } from 'react';
+import { Pagination } from '@/components/ui/Pagination';
+import type { Quiz, QuizCreateRequest } from '@/services/quizService';
+import type { Subject } from '@/services/subjectService';
+import type { Group } from '@/services/groupService';
 import type { User } from '@/types/auth';
 import { Button } from '@/components/ui/Button';
 import {
@@ -18,9 +18,14 @@ import { Plus, Pencil, Trash2, Loader2, BookOpen } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/Input';
+import { Switch } from '@/components/ui/Switch';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQuizzes, useCreateQuiz, useUpdateQuiz, useDeleteQuiz } from '@/hooks/useQuizzes';
+import { useSubjects } from '@/hooks/useSubjects';
+import { useGroups } from '@/hooks/useGroups';
+import { useUsers } from '@/hooks/useUsers';
 
 const quizSchema = z.object({
     title: z.string().min(3, 'Title is required'),
@@ -36,39 +41,27 @@ const quizSchema = z.object({
 type QuizFormValues = z.infer<typeof quizSchema>;
 
 const QuizzesPage = () => {
-    const [quizzes, setQuizzes] = useState<Quiz[]>([]);
-    const [subjects, setSubjects] = useState<Subject[]>([]);
-    const [groups, setGroups] = useState<Group[]>([]);
-    const [users, setUsers] = useState<User[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [quizToDelete, setQuizToDelete] = useState<Quiz | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const pageSize = 10;
+    const [isUpdatingStatus, setIsUpdatingStatus] = useState<number | null>(null);
 
-    const fetchData = async () => {
-        try {
-            setIsLoading(true);
-            const [quizzesData, subjectsData, groupsData, usersData] = await Promise.all([
-                quizService.getQuizzes(),
-                subjectService.getSubjects(),
-                groupService.getGroups(),
-                userService.getUsers(),
-            ]);
-            setQuizzes(quizzesData.quizzes || []);
-            setSubjects(subjectsData.subjects);
-            setGroups(groupsData.groups);
-            setUsers(usersData.users);
-        } catch (error) {
-            console.error('Failed to fetch data', error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    const { data: quizzesData, isLoading: isQuizzesLoading } = useQuizzes(currentPage, pageSize);
+    const { data: subjectsData } = useSubjects(1, 100);
+    const { data: groupsData } = useGroups(1, 100);
+    const { data: usersData } = useUsers(1, 100);
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+    const updateQuizMutation = useUpdateQuiz();
+    const deleteQuizMutation = useDeleteQuiz();
+
+    const quizzes = quizzesData?.quizzes || [];
+    const totalPages = quizzesData ? Math.ceil(quizzesData.total / pageSize) : 1;
+    const subjects = subjectsData?.subjects || [];
+    const groups = groupsData?.groups || [];
+    const users = usersData?.users || [];
 
     const handleCreateQuiz = () => {
         setSelectedQuiz(null);
@@ -87,19 +80,44 @@ const QuizzesPage = () => {
 
     const handleConfirmDelete = async () => {
         if (!quizToDelete) return;
-        try {
-            await quizService.deleteQuiz(quizToDelete.id);
-            fetchData();
-            setIsDeleteModalOpen(false);
-            setQuizToDelete(null);
-        } catch (error) {
-            console.error('Failed to delete quiz', error);
-        }
+        deleteQuizMutation.mutate(quizToDelete.id, {
+            onSuccess: () => {
+                setIsDeleteModalOpen(false);
+                setQuizToDelete(null);
+            },
+        });
     };
 
     const handleSuccess = () => {
         setIsModalOpen(false);
-        fetchData();
+    };
+
+    const handleToggleStatus = (quiz: Quiz) => {
+        setIsUpdatingStatus(quiz.id);
+        const payload: QuizCreateRequest = {
+            title: quiz.title,
+            question_number: quiz.question_number,
+            duration: quiz.duration,
+            pin: quiz.pin,
+            user_id: quiz.user_id || undefined, // undefined to send as optional/null-like
+            group_id: quiz.group_id || undefined,
+            subject_id: quiz.subject_id || undefined,
+            is_active: !quiz.is_active,
+        };
+        
+        // Note: The backend expects specific types, here we assume update handles partial or full updates
+        // However, looking at the schema, it seems we might need to send all fields.
+        // We are using the same payload structure.
+        
+        updateQuizMutation.mutate({ id: quiz.id, data: payload }, {
+            onSettled: () => {
+                setIsUpdatingStatus(null);
+            },
+            onError: (error) => {
+                console.error('Failed to update quiz status', error);
+                alert('Failed to update quiz status');
+            }
+        });
     };
 
     const getSubjectName = (id?: number) => subjects.find(s => s.id === id)?.name || '-';
@@ -123,7 +141,7 @@ const QuizzesPage = () => {
                     <CardTitle>All Quizzes</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {isLoading ? (
+                    {isQuizzesLoading ? (
                         <div className="flex justify-center p-8">
                             <Loader2 className="h-8 w-8 animate-spin" />
                         </div>
@@ -154,9 +172,16 @@ const QuizzesPage = () => {
                                         <TableCell>{quiz.duration} min</TableCell>
                                         <TableCell><span className="font-mono bg-muted px-2 py-1 rounded">{quiz.pin}</span></TableCell>
                                         <TableCell>
-                                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${quiz.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                                                {quiz.is_active ? 'Active' : 'Inactive'}
-                                            </span>
+                                            <div className="flex items-center space-x-2">
+                                                <Switch
+                                                    checked={quiz.is_active}
+                                                    onCheckedChange={() => handleToggleStatus(quiz)}
+                                                    disabled={isUpdatingStatus === quiz.id || updateQuizMutation.isPending}
+                                                />
+                                                <span className={`text-xs ${quiz.is_active ? 'text-green-600 font-medium' : 'text-muted-foreground'}`}>
+                                                    {quiz.is_active ? 'Active' : 'Inactive'}
+                                                </span>
+                                            </div>
                                         </TableCell>
                                         <TableCell>{getSubjectName(quiz.subject_id)}</TableCell>
                                         <TableCell>{getGroupName(quiz.group_id)}</TableCell>
@@ -186,6 +211,13 @@ const QuizzesPage = () => {
                     )}
                 </CardContent>
             </Card>
+
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                isLoading={isQuizzesLoading}
+            />
 
             <QuizModal
                 isOpen={isModalOpen}
@@ -230,7 +262,9 @@ const QuizModal = ({
         register,
         handleSubmit,
         reset,
-        formState: { errors, isSubmitting },
+        setValue,
+        watch,
+        formState: { errors },
     } = useForm<QuizFormValues>({
         resolver: zodResolver(quizSchema),
         defaultValues: {
@@ -238,6 +272,12 @@ const QuizModal = ({
             is_active: false,
         }
     });
+
+    const createMutation = useCreateQuiz();
+    const updateMutation = useUpdateQuiz();
+    const isSubmitting = createMutation.isPending || updateMutation.isPending;
+
+    const isActive = watch('is_active');
 
     useEffect(() => {
         if (quiz) {
@@ -254,39 +294,45 @@ const QuizModal = ({
         } else {
             reset({
                 title: '',
-                question_number: '',
-                duration: '',
-                pin: '',
+                question_number: '10', // Default
+                duration: '30', // Default
+                pin: Math.random().toString().slice(2, 6), // Generate random PIN
                 user_id: '',
                 group_id: '',
                 subject_id: '',
                 is_active: false,
             });
         }
-    }, [quiz, reset]);
+    }, [quiz, reset, isOpen]);
 
-    const onSubmit = async (data: QuizFormValues) => {
-        try {
-            const payload: QuizCreateRequest = {
-                title: data.title,
-                question_number: parseInt(data.question_number, 10),
-                duration: parseInt(data.duration, 10),
-                pin: data.pin,
-                user_id: data.user_id ? parseInt(data.user_id, 10) : null,
-                group_id: data.group_id ? parseInt(data.group_id, 10) : null,
-                subject_id: data.subject_id ? parseInt(data.subject_id, 10) : null,
-                is_active: data.is_active,
-            };
+    const onSubmit = (data: QuizFormValues) => {
+        const payload: QuizCreateRequest = {
+            title: data.title,
+            question_number: parseInt(data.question_number, 10),
+            duration: parseInt(data.duration, 10),
+            pin: data.pin,
+            user_id: data.user_id ? parseInt(data.user_id, 10) : undefined,
+            group_id: data.group_id ? parseInt(data.group_id, 10) : undefined,
+            subject_id: data.subject_id ? parseInt(data.subject_id, 10) : undefined,
+            is_active: data.is_active,
+        };
 
-            if (quiz) {
-                await quizService.updateQuiz(quiz.id, payload);
-            } else {
-                await quizService.createQuiz(payload);
-            }
-            onSuccess();
-        } catch (error) {
-            console.error('Failed to save quiz', error);
-            alert('Failed to save quiz');
+        if (quiz) {
+            updateMutation.mutate({ id: quiz.id, data: payload }, {
+                onSuccess: () => onSuccess(),
+                onError: (error) => {
+                    console.error('Failed to update quiz', error);
+                    alert('Failed to update quiz');
+                }
+            });
+        } else {
+            createMutation.mutate(payload, {
+                onSuccess: () => onSuccess(),
+                onError: (error) => {
+                    console.error('Failed to create quiz', error);
+                    alert('Failed to create quiz');
+                }
+            });
         }
     };
 
@@ -325,13 +371,12 @@ const QuizModal = ({
                         error={errors.pin?.message}
                     />
                     <div className="flex items-center space-x-2 pt-8">
-                        <input
-                            type="checkbox"
-                            id="is_active"
-                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                            {...register('is_active')}
+                        <Switch
+                            id="modal-is-active"
+                            checked={isActive}
+                            onCheckedChange={(checked) => setValue('is_active', checked)}
                         />
-                        <label htmlFor="is_active" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        <label htmlFor="modal-is-active" className="text-sm font-medium leading-none cursor-pointer">
                             Active
                         </label>
                     </div>

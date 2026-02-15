@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { resultService, type Result } from '@/services/resultService';
+import { useState } from 'react';
+import { Pagination } from '@/components/ui/Pagination';
+import { useResults } from '@/hooks/useResults';
 import {
     Table,
     TableBody,
@@ -12,25 +13,13 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Loader2, FileText } from 'lucide-react';
 
 const ResultsPage = () => {
-    const [results, setResults] = useState<Result[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [currentPage, setCurrentPage] = useState(1);
+    const pageSize = 10;
 
-    const fetchResults = async () => {
-        try {
-            setIsLoading(true);
-            const data = await resultService.getResults();
-            setResults(data.results || []);
-        } catch (error) {
-            console.error('Failed to fetch results', error);
-            setResults([]);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    const { data: resultsData, isLoading: isResultsLoading } = useResults(currentPage, pageSize);
 
-    useEffect(() => {
-        fetchResults();
-    }, []);
+    const results = resultsData?.results || [];
+    const totalPages = resultsData ? Math.ceil(resultsData.total / pageSize) : 1;
 
     return (
         <div className="space-y-6">
@@ -46,7 +35,7 @@ const ResultsPage = () => {
                     <CardTitle>All Results</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {isLoading ? (
+                    {isResultsLoading ? (
                         <div className="flex justify-center p-8">
                             <Loader2 className="h-8 w-8 animate-spin" />
                         </div>
@@ -93,6 +82,13 @@ const ResultsPage = () => {
                     )}
                 </CardContent>
             </Card>
+
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                isLoading={isResultsLoading}
+            />
         </div>
     );
 };

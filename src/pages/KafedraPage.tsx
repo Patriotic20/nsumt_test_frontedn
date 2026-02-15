@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Pagination } from '@/components/ui/Pagination';
 import { kafedraService, type Kafedra } from '@/services/kafedraService';
 import { facultyService, type Faculty } from '@/services/facultyService';
 import { Button } from '@/components/ui/Button';
@@ -29,15 +30,19 @@ const KafedraPage = () => {
     const [selectedKafedra, setSelectedKafedra] = useState<Kafedra | null>(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [kafedraToDelete, setKafedraToDelete] = useState<Kafedra | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const pageSize = 10;
 
     const fetchData = async () => {
         try {
             setIsLoading(true);
             const [kafedrasData, facultiesData] = await Promise.all([
-                kafedraService.getKafedras(),
+                kafedraService.getKafedras(currentPage, pageSize),
                 facultyService.getFaculties(),
             ]);
             setKafedras(kafedrasData.kafedras);
+            setTotalPages(Math.ceil(kafedrasData.total / pageSize));
             setFaculties(facultiesData.faculties);
         } catch (error) {
             console.error('Failed to fetch data', error);
@@ -46,7 +51,7 @@ const KafedraPage = () => {
         }
     };
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => { fetchData(); }, [currentPage]);
 
     const handleDeleteClick = (kafedra: Kafedra) => {
         setKafedraToDelete(kafedra);
@@ -147,6 +152,14 @@ const KafedraPage = () => {
                     )}
                 </CardContent>
             </Card>
+
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                isLoading={isLoading}
+            />
+
             <KafedraModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} kafedra={selectedKafedra}
                 faculties={faculties} onSuccess={handleSuccess} />
             <ConfirmDialog

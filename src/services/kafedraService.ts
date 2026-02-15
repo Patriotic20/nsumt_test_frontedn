@@ -23,6 +23,11 @@ export const kafedraService = {
         return response.data;
     },
 
+    getKafedraById: async (id: number): Promise<Kafedra> => {
+        const response = await api.get<Kafedra>(`/kafedra/${id}`);
+        return response.data;
+    },
+
     createKafedra: async (data: { name: string; faculty_id: number }) => {
         const response = await api.post('/kafedra/', data);
         return response.data;

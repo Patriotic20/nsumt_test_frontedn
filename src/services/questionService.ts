@@ -40,6 +40,11 @@ export const questionService = {
         return response.data;
     },
 
+    getQuestionById: async (id: number): Promise<Question> => {
+        const response = await api.get<Question>(`/question/${id}`);
+        return response.data;
+    },
+
     createQuestion: async (data: QuestionCreateRequest) => {
         const response = await api.post('/question/', data);
         return response.data;

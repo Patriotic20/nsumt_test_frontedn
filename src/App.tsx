@@ -16,6 +16,7 @@ import SubjectsPage from '@/pages/SubjectsPage';
 import StudentsPage from '@/pages/StudentsPage';
 import QuestionsPage from '@/pages/QuestionsPage';
 import QuestionFormPage from '@/pages/QuestionFormPage';
+import QuizTestPage from '@/pages/QuizTestPage';
 
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -54,6 +55,7 @@ function App() {
               <Route path="/questions/:id/edit" element={<QuestionFormPage />} />
               <Route path="/subjects" element={<SubjectsPage />} />
               <Route path="/quizzes" element={<QuizzesPage />} />
+              <Route path="/quiz-test" element={<QuizTestPage />} />
               <Route path="/results" element={<ResultsPage />} />
             </Route>
           </Route>

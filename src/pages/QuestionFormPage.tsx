@@ -1,15 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { questionService, type QuestionCreateRequest } from '@/services/questionService';
-import { subjectService, type Subject } from '@/services/subjectService';
+import type { QuestionCreateRequest } from '@/services/questionService';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { ArrowLeft, Loader2 } from 'lucide-react';
-import JoditEditor from 'jodit-react'; // Ensure types are handled
-import { useForm, Controller } from 'react-hook-form'; // Use Controller for complex inputs
+import JoditEditor from 'jodit-react';
+import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQuestion, useCreateQuestion, useUpdateQuestion } from '@/hooks/useQuestions';
+import { useSubjects } from '@/hooks/useSubjects';
 
 const questionSchema = z.object({
     subject_id: z.string().min(1, 'Subject is required'),
@@ -27,15 +28,24 @@ const QuestionFormPage = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
     const isEditMode = !!id;
-    const [isLoading, setIsLoading] = useState(true);
-    const [subjects, setSubjects] = useState<Subject[]>([]);
+    const questionId = id ? parseInt(id, 10) : 0;
+
+    const { data: subjectsData } = useSubjects(1, 100);
+    const { data: question, isLoading: isQuestionLoading } = useQuestion(questionId);
+
+    const createMutation = useCreateQuestion();
+    const updateMutation = useUpdateQuestion();
+
+    const subjects = subjectsData?.subjects || [];
+    const isSubmitting = createMutation.isPending || updateMutation.isPending;
+    const isLoading = isEditMode && isQuestionLoading;
 
     const {
         register,
         handleSubmit,
         control,
         reset,
-        formState: { errors, isSubmitting },
+        formState: { errors },
     } = useForm<QuestionFormValues>({
         resolver: zodResolver(questionSchema),
         defaultValues: {
@@ -49,71 +59,47 @@ const QuestionFormPage = () => {
     });
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setIsLoading(true);
-                const [subjectsData] = await Promise.all([
-                    subjectService.getSubjects(),
-                ]);
-                setSubjects(subjectsData.subjects);
+        if (question) {
+            reset({
+                subject_id: question.subject_id.toString(),
+                text: question.text,
+                option_a: question.option_a,
+                option_b: question.option_b,
+                option_c: question.option_c,
+                option_d: question.option_d,
+            });
+        }
+    }, [question, reset]);
 
-                if (isEditMode) {
-                    // Fetch existing question data
-                    // Since we don't have getQuestionById, we might need to find it from list or add endpoint
-                    // For now, let's assume we can implementation getQuestionById or fetch list and find
-                    // Implementation detail: questionService.getQuestion(id) is needed.
-                    // If not available, we can fetch all and find, but that's inefficient.
-                    // Let's assume fetching list for now as a fallback or add getQuestion
-                    const questionsData = await questionService.getQuestions(1, 1000); // Temporary hack
-                    const question = questionsData.questions.find(q => q.id === parseInt(id));
-
-                    if (question) {
-                        reset({
-                            subject_id: question.subject_id.toString(),
-                            text: question.text,
-                            option_a: question.option_a,
-                            option_b: question.option_b,
-                            option_c: question.option_c,
-                            option_d: question.option_d,
-                        });
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to load data', error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchData();
-    }, [id, isEditMode, reset]);
-
-    const onSubmit = async (data: QuestionFormValues) => {
+    const onSubmit = (data: QuestionFormValues) => {
         if (!user) {
             alert('User not authenticated');
             return;
         }
 
-        try {
-            const payload: QuestionCreateRequest = {
-                subject_id: parseInt(data.subject_id, 10),
-                user_id: user.id,
-                text: data.text,
-                option_a: data.option_a,
-                option_b: data.option_b,
-                option_c: data.option_c,
-                option_d: data.option_d,
-            };
-
-            if (isEditMode && id) {
-                await questionService.updateQuestion(parseInt(id), payload);
-            } else {
-                await questionService.createQuestion(payload);
-            }
-            navigate('/questions');
-        } catch (error) {
+        const payload: QuestionCreateRequest = {
+            subject_id: parseInt(data.subject_id, 10),
+            user_id: user.id,
+            text: data.text,
+            option_a: data.option_a,
+            option_b: data.option_b,
+            option_c: data.option_c,
+            option_d: data.option_d,
+        };
+        
+        const onSuccess = () => {
+             navigate('/questions');
+        };
+        
+        const onError = (error: unknown) => {
             console.error('Failed to save question', error);
             alert('Failed to save question');
+        }
+
+        if (isEditMode && id) {
+            updateMutation.mutate({ id: parseInt(id), data: payload }, { onSuccess, onError });
+        } else {
+            createMutation.mutate(payload, { onSuccess, onError });
         }
     };
 

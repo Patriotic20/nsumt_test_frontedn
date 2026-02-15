@@ -35,4 +35,12 @@ export const resultService = {
         });
         return response.data;
     },
+    getResultById: async (id: number): Promise<Result> => {
+        const response = await api.get<Result>(`/result/${id}`);
+        return response.data;
+    },
+
+    deleteResult: async (id: number): Promise<void> => {
+        await api.delete(`/result/${id}`);
+    },
 };

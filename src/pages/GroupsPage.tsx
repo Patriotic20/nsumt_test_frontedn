@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
-import { groupService, type Group } from '@/services/groupService';
-import { facultyService, type Faculty } from '@/services/facultyService';
+import { useState, useEffect } from 'react';
+import { Pagination } from '@/components/ui/Pagination';
+import { type Group } from '@/services/groupService';
+import { type Faculty } from '@/services/facultyService';
 import { Button } from '@/components/ui/Button';
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -13,6 +14,8 @@ import { Input } from '@/components/ui/Input';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useGroups, useCreateGroup, useUpdateGroup, useDeleteGroup } from '@/hooks/useGroups';
+import { useFaculties } from '@/hooks/useReferenceData';
 
 const groupSchema = z.object({
     name: z.string().min(1, 'Group name is required'),
@@ -22,31 +25,20 @@ const groupSchema = z.object({
 type GroupFormValues = z.infer<typeof groupSchema>;
 
 const GroupsPage = () => {
-    const [groups, setGroups] = useState<Group[]>([]);
-    const [faculties, setFaculties] = useState<Faculty[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const pageSize = 10;
 
-    const fetchData = async () => {
-        try {
-            setIsLoading(true);
-            const [groupsData, facultiesData] = await Promise.all([
-                groupService.getGroups(),
-                facultyService.getFaculties(),
-            ]);
-            setGroups(groupsData.groups);
-            setFaculties(facultiesData.faculties);
-        } catch (error) {
-            console.error('Failed to fetch data', error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    const { data: groupsData, isLoading: isGroupsLoading } = useGroups(currentPage, pageSize);
+    const { data: facultiesData } = useFaculties();
+    const deleteGroupMutation = useDeleteGroup();
 
-    useEffect(() => { fetchData(); }, []);
+    const groups = groupsData?.groups || [];
+    const totalPages = groupsData ? Math.ceil(groupsData.total / pageSize) : 1;
+    const faculties = facultiesData?.faculties || [];
 
     const handleDeleteClick = (group: Group) => {
         setGroupToDelete(group);
@@ -56,14 +48,12 @@ const GroupsPage = () => {
     const handleConfirmDelete = async () => {
         if (!groupToDelete) return;
 
-        try {
-            await groupService.deleteGroup(groupToDelete.id);
-            setGroups((prev) => prev.filter((item) => item.id !== groupToDelete.id)); // Optimistic update
-            setIsDeleteModalOpen(false);
-            setGroupToDelete(null);
-        } catch (error) {
-            console.error('Failed to delete group', error);
-        }
+        deleteGroupMutation.mutate(groupToDelete.id, {
+            onSuccess: () => {
+                setIsDeleteModalOpen(false);
+                setGroupToDelete(null);
+            },
+        });
     };
 
     const getFacultyName = (facultyId: number) => {
@@ -71,17 +61,8 @@ const GroupsPage = () => {
         return faculty ? faculty.name : `ID: ${facultyId}`;
     };
 
-    const handleSuccess = (savedGroup?: Group) => {
+    const handleSuccess = (_savedGroup?: Group) => {
         setIsModalOpen(false);
-        if (savedGroup) {
-            if (selectedGroup) {
-                setGroups((prev) => prev.map((g) => (g.id === savedGroup.id ? savedGroup : g)));
-            } else {
-                setGroups((prev) => [...prev, savedGroup]);
-            }
-        } else {
-            fetchData();
-        }
     };
 
     return (
@@ -99,7 +80,7 @@ const GroupsPage = () => {
             <Card>
                 <CardHeader><CardTitle>All Groups</CardTitle></CardHeader>
                 <CardContent>
-                    {isLoading ? (
+                    {isGroupsLoading ? (
                         <div className="flex justify-center p-8">
                             <Loader2 className="h-8 w-8 animate-spin" />
                         </div>
@@ -147,6 +128,14 @@ const GroupsPage = () => {
                     )}
                 </CardContent>
             </Card>
+
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                isLoading={isGroupsLoading}
+            />
+
             <GroupModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} group={selectedGroup}
                 faculties={faculties} onSuccess={handleSuccess} />
             <ConfirmDialog
@@ -165,10 +154,14 @@ const GroupsPage = () => {
 const GroupModal = ({ isOpen, onClose, group, faculties, onSuccess }: {
     isOpen: boolean; onClose: () => void; group: Group | null; faculties: Faculty[]; onSuccess: (group?: Group) => void;
 }) => {
-    const { register, handleSubmit, reset, formState: { errors, isSubmitting }, setValue, watch } = useForm<GroupFormValues>({
+    const { register, handleSubmit, reset, formState: { errors }, setValue, watch } = useForm<GroupFormValues>({
         resolver: zodResolver(groupSchema),
         defaultValues: { name: '', faculty_id: 0 },
     });
+
+    const createMutation = useCreateGroup();
+    const updateMutation = useUpdateGroup();
+    const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
     const selectedFacultyId = watch('faculty_id');
 
@@ -180,18 +173,17 @@ const GroupModal = ({ isOpen, onClose, group, faculties, onSuccess }: {
         }
     }, [group, reset]);
 
-    const onSubmit = async (data: GroupFormValues) => {
-        try {
-            let result;
-            if (group) {
-                result = await groupService.updateGroup(group.id, data);
-            } else {
-                result = await groupService.createGroup(data);
-            }
-            onSuccess(result);
-        } catch (error) {
-            console.error('Failed to save group', error);
-            alert('Failed to save group');
+    const onSubmit = (data: GroupFormValues) => {
+        if (group) {
+            updateMutation.mutate({ id: group.id, data }, {
+                onSuccess: (data) => onSuccess(data),
+                onError: () => alert('Failed to update group'),
+            });
+        } else {
+            createMutation.mutate(data, {
+                onSuccess: (data) => onSuccess(data),
+                onError: () => alert('Failed to create group'),
+            });
         }
     };
 

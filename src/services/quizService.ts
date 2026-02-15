@@ -40,6 +40,11 @@ export const quizService = {
         return response.data;
     },
 
+    getQuizById: async (id: number): Promise<Quiz> => {
+        const response = await api.get<Quiz>(`/quiz/${id}`);
+        return response.data;
+    },
+
     createQuiz: async (data: QuizCreateRequest) => {
         const response = await api.post('/quiz/', data);
         return response.data;

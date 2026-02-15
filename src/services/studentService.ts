@@ -29,23 +29,30 @@ export interface StudentListResponse {
 
 export const studentService = {
     getStudents: async (page = 1, limit = 10) => {
-        const response = await api.get<StudentListResponse>('/student/', {
+        const response = await api.get<StudentListResponse>('/students/', {
             params: { page, limit },
         });
         return response.data;
     },
 
-    createStudent: async (data: StudentCreateRequest) => {
-        const response = await api.post('/student/', data);
+
+
+    createStudent: async (data: StudentCreateRequest): Promise<Student> => {
+        const response = await api.post<Student>('/students/', data);
         return response.data;
     },
 
-    updateStudent: async (id: number, data: StudentCreateRequest) => {
-        const response = await api.put(`/student/${id}`, data);
+    getStudentById: async (id: number): Promise<Student> => {
+        const response = await api.get<Student>(`/students/${id}`);
         return response.data;
     },
 
-    deleteStudent: async (id: number) => {
-        await api.delete(`/student/${id}`);
+    updateStudent: async (id: number, data: StudentCreateRequest): Promise<Student> => {
+        const response = await api.put<Student>(`/students/${id}`, data);
+        return response.data;
+    },
+
+    deleteStudent: async (id: number): Promise<void> => {
+        await api.delete(`/students/${id}`);
     },
 };

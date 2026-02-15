@@ -35,6 +35,11 @@ export const teacherService = {
         return response.data;
     },
 
+    getTeacherById: async (id: number): Promise<Teacher> => {
+        const response = await api.get<Teacher>(`/teacher/${id}`);
+        return response.data;
+    },
+
     createTeacher: async (data: TeacherCreateRequest) => {
         const response = await api.post('/teacher/', data);
         return response.data;

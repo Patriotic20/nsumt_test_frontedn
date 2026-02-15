@@ -16,6 +16,11 @@ export const userService = {
         return response.data;
     },
 
+    getUserById: async (id: number): Promise<User> => {
+        const response = await api.get<User>(`/user/${id}`);
+        return response.data;
+    },
+
     createUser: async (userData: any) => {
         const response = await api.post('/user/', userData);
         return response.data;
@@ -28,5 +33,10 @@ export const userService = {
 
     deleteUser: async (id: number) => {
         await api.delete(`/user/${id}`);
+    },
+
+    syncHemisUsers: async () => {
+        const response = await api.post('/user/sync-hemis');
+        return response.data;
     },
 };

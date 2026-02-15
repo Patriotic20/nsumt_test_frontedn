@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { userService } from '@/services/userService';
-import { roleService, type Role } from '@/services/roleService';
-import type { User } from '@/types/auth';
+import { useState, useEffect } from 'react';
+import { Pagination } from '@/components/ui/Pagination';
+import type { User, UserCreateRequest, Role } from '@/types/auth';
 import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import {
     Table,
     TableBody,
@@ -12,61 +12,42 @@ import {
     TableRow,
 } from '@/components/ui/Table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
-
+import { Plus, Pencil, Trash2, Loader2, Download } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/Input';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 
+import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useSyncHemisUsers } from '@/hooks/useUsers';
+import { useRoles } from '@/hooks/useReferenceData';
+
 const userSchema = z.object({
     username: z.string().min(3, 'Username must be at least 3 characters'),
-    password: z.string().min(6, 'Password must be at least 6 characters').optional().or(z.literal('')),
-    roles: z.array(z.string()).min(1, 'At least one role is required'),
+    password: z.string().optional(),
+    role_id: z.string().min(1, 'Role is required'),
+    is_active: z.boolean().default(true),
 });
 
 type UserFormValues = z.infer<typeof userSchema>;
 
 const UsersPage = () => {
-    const [users, setUsers] = useState<User[]>([]);
-    const [roles, setRoles] = useState<Role[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState<User | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [isHemisImportOpen, setIsHemisImportOpen] = useState(false);
+    const pageSize = 10;
 
-    const fetchData = async () => {
-        try {
-            setIsLoading(true);
-            const [usersData, rolesData] = await Promise.all([
-                userService.getUsers(),
-                roleService.getRoles(),
-            ]);
-            setUsers(usersData.users);
-            setRoles(rolesData.roles);
-        } catch (error) {
-            console.error('Failed to fetch data', error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    const { data: usersData, isLoading: isUsersLoading } = useUsers(currentPage, pageSize);
+    const { data: rolesData } = useRoles();
+    const deleteUserMutation = useDeleteUser();
+    const syncHemisMutation = useSyncHemisUsers();
 
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    const handleCreateUser = () => {
-        setSelectedUser(null);
-        setIsModalOpen(true);
-    };
-
-    const handleEditUser = (user: User) => {
-        setSelectedUser(user);
-        setIsModalOpen(true);
-    };
+    const users = usersData?.users || [];
+    const totalPages = usersData ? Math.ceil(usersData.total / pageSize) : 1;
+    const roles = rolesData?.roles || [];
 
     const handleDeleteClick = (user: User) => {
         setUserToDelete(user);
@@ -75,17 +56,26 @@ const UsersPage = () => {
 
     const handleConfirmDelete = async () => {
         if (!userToDelete) return;
-        try {
-            await userService.deleteUser(userToDelete.id);
-            // Optimistic update
-            setUsers((prev) => prev.filter((u) => u.id !== userToDelete.id));
-            setIsDeleteModalOpen(false);
-            setUserToDelete(null);
-        } catch (error) {
-            console.error('Failed to delete user', error);
-            // If deletion fails, re-fetch to ensure consistency
-            fetchData();
-        }
+        deleteUserMutation.mutate(userToDelete.id, {
+            onSuccess: () => {
+                setIsDeleteModalOpen(false);
+                setUserToDelete(null);
+            },
+        });
+    };
+
+    const handleSuccess = () => {
+        setIsModalOpen(false);
+    };
+
+    const getRoleName = (roleId?: number) => {
+        if (!roleId) return 'N/A';
+        const role = roles.find(r => r.id === roleId);
+        return role ? role.name : `ID: ${roleId}`;
+    };
+
+    const handleHemisSuccess = () => {
+        setIsHemisImportOpen(false);
     };
 
     return (
@@ -93,12 +83,18 @@ const UsersPage = () => {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Users</h1>
-                    <p className="text-muted-foreground">Manage system users (Teachers, Students)</p>
+                    <p className="text-muted-foreground">Manage system users</p>
                 </div>
-                <Button onClick={handleCreateUser}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add User
-                </Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setIsHemisImportOpen(true)}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Import from Hemis
+                    </Button>
+                    <Button onClick={() => { setSelectedUser(null); setIsModalOpen(true); }}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add User
+                    </Button>
+                </div>
             </div>
 
             <Card>
@@ -106,9 +102,13 @@ const UsersPage = () => {
                     <CardTitle>All Users</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {isLoading ? (
+                    {isUsersLoading ? (
                         <div className="flex justify-center p-8">
                             <Loader2 className="h-8 w-8 animate-spin" />
+                        </div>
+                    ) : users.length === 0 ? (
+                        <div className="flex justify-center p-8 text-muted-foreground">
+                            No users found.
                         </div>
                     ) : (
                         <Table>
@@ -116,7 +116,8 @@ const UsersPage = () => {
                                 <TableRow>
                                     <TableHead>ID</TableHead>
                                     <TableHead>Username</TableHead>
-                                    <TableHead>Roles</TableHead>
+                                    <TableHead>Role</TableHead>
+                                    <TableHead>Status</TableHead>
                                     <TableHead>Created At</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
@@ -127,14 +128,18 @@ const UsersPage = () => {
                                         <TableCell>{user.id}</TableCell>
                                         <TableCell className="font-medium">{user.username}</TableCell>
                                         <TableCell>
-                                            {user.roles && user.roles.map((role) => (
-                                                <span
-                                                    key={role.id}
-                                                    className="mr-2 inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10"
-                                                >
-                                                    {role.name}
-                                                </span>
-                                            ))}
+                                            <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 text-foreground">
+                                                {getRoleName(user.role_id)}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+                                                user.is_active
+                                                    ? 'border-transparent bg-primary text-primary-foreground hover:bg-primary/80'
+                                                    : 'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                                            }`}>
+                                                {user.is_active ? 'Active' : 'Inactive'}
+                                            </span>
                                         </TableCell>
                                         <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
                                         <TableCell className="text-right">
@@ -142,7 +147,7 @@ const UsersPage = () => {
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    onClick={() => handleEditUser(user)}
+                                                    onClick={() => { setSelectedUser(user); setIsModalOpen(true); }}
                                                 >
                                                     <Pencil className="h-4 w-4" />
                                                 </Button>
@@ -150,7 +155,6 @@ const UsersPage = () => {
                                                     variant="ghost"
                                                     size="sm"
                                                     className="text-destructive hover:text-destructive"
-
                                                     onClick={() => handleDeleteClick(user)}
                                                 >
                                                     <Trash2 className="h-4 w-4" />
@@ -165,22 +169,34 @@ const UsersPage = () => {
                 </CardContent>
             </Card>
 
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                isLoading={isUsersLoading}
+            />
+
             <UserModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 user={selectedUser}
-                availableRoles={roles}
-                onSuccess={() => {
-                    setIsModalOpen(false);
-                    fetchData();
-                }}
+                roles={roles}
+                onSuccess={handleSuccess}
             />
+
+            <HemisImportModal
+                isOpen={isHemisImportOpen}
+                onClose={() => setIsHemisImportOpen(false)}
+                onSuccess={handleHemisSuccess}
+                syncHemisMutation={syncHemisMutation}
+            />
+
             <ConfirmDialog
                 isOpen={isDeleteModalOpen}
                 onClose={() => setIsDeleteModalOpen(false)}
                 onConfirm={handleConfirmDelete}
                 title="Delete User"
-                description={`Are you sure you want to delete the user "${userToDelete?.username}"? This action cannot be undone.`}
+                description={`Are you sure you want to delete '${userToDelete?.username}'? This action cannot be undone.`}
                 confirmText="Delete"
                 cancelText="Cancel"
             />
@@ -192,78 +208,81 @@ const UserModal = ({
     isOpen,
     onClose,
     user,
-    availableRoles,
+    roles,
     onSuccess,
 }: {
     isOpen: boolean;
     onClose: () => void;
     user: User | null;
-    availableRoles: Role[];
-    onSuccess: () => void;
+    roles: Role[];
+    onSuccess: (user?: User) => void;
 }) => {
     const {
         register,
         handleSubmit,
         reset,
-        formState: { errors, isSubmitting },
-        watch,
-        setValue,
+        formState: { errors },
     } = useForm<UserFormValues>({
-        resolver: zodResolver(userSchema),
+        resolver: zodResolver(userSchema) as any,
         defaultValues: {
             username: '',
             password: '',
-            roles: [],
-        }
+            role_id: '',
+            is_active: true,
+        },
     });
 
-    const selectedRoles = watch('roles') || [];
+    const createMutation = useCreateUser();
+    const updateMutation = useUpdateUser();
+    const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
     useEffect(() => {
         if (user) {
             reset({
                 username: user.username,
-                password: '',
-                roles: user.roles?.map(r => r.name) || []
+                password: '', // Don't fill password on edit
+                role_id: user.role_id ? user.role_id.toString() : '',
+                is_active: user.is_active,
             });
         } else {
-            reset({ username: '', password: '', roles: [] });
+            reset({
+                username: '',
+                password: '',
+                role_id: '',
+                is_active: true,
+            });
         }
     }, [user, reset]);
 
-    const handleRoleToggle = (roleName: string) => {
-        const currentRoles = selectedRoles;
-        if (currentRoles.includes(roleName)) {
-            setValue('roles', currentRoles.filter(r => r !== roleName));
+    const onSubmit = (data: UserFormValues) => {
+        const payload: UserCreateRequest = {
+            username: data.username,
+            password: data.password || undefined,
+            role_id: parseInt(data.role_id, 10),
+            is_active: data.is_active,
+        };
+
+        if (user) {
+            updateMutation.mutate({ id: user.id, data: payload }, {
+                onSuccess: (data) => onSuccess(data),
+                onError: (error) => {
+                    console.error('Failed to update user', error);
+                    alert('Failed to update user');
+                }
+            });
         } else {
-            setValue('roles', [...currentRoles, roleName]);
-        }
-    };
-
-    const onSubmit = async (data: UserFormValues) => {
-        try {
-            if (user) {
-                const updateData: Record<string, string> = { username: data.username };
-                await userService.updateUser(user.id, updateData);
-            } else {
-                const createPayload = {
-                    ...data,
-                    roles: data.roles.map(name => ({ name }))
-                };
-                await userService.createUser(createPayload);
+            if (!data.password) {
+                alert('Password is required for new users');
+                return;
             }
-            onSuccess();
-        } catch (error) {
-            console.error('Failed to save user', error);
-            alert('Failed to save user');
+            createMutation.mutate({ ...payload, password: data.password! }, {
+                onSuccess: (data) => onSuccess(data),
+                onError: (error) => {
+                    console.error('Failed to create user', error);
+                    alert('Failed to create user');
+                }
+            });
         }
-    };
-
-    const roleButtonClass = (roleName: string) => {
-        const isSelected = selectedRoles.includes(roleName);
-        return isSelected
-            ? 'inline-flex items-center rounded-md px-3 py-1 text-sm font-medium ring-1 ring-inset transition-colors bg-primary text-primary-foreground ring-primary'
-            : 'inline-flex items-center rounded-md px-3 py-1 text-sm font-medium ring-1 ring-inset transition-colors bg-muted text-muted-foreground ring-input hover:bg-muted/80';
     };
 
     return (
@@ -278,35 +297,45 @@ const UserModal = ({
                     {...register('username')}
                     error={errors.username?.message}
                 />
+                
                 <Input
-                    label="Password"
+                    label={user ? "Password (leave blank to keep current)" : "Password"}
                     type="password"
                     {...register('password')}
                     error={errors.password?.message}
-                    placeholder={user ? 'Leave empty to keep current' : ''}
                 />
 
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Roles</label>
-                    <div className="flex flex-wrap gap-2">
-                        {availableRoles.map(role => (
-                            <button
-                                key={role.id}
-                                type="button"
-                                onClick={() => handleRoleToggle(role.name)}
-                                className={roleButtonClass(role.name)}
-                            >
+                    <label className="text-sm font-medium">Role</label>
+                    <select
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        {...register('role_id')}
+                    >
+                        <option value="">Select a role</option>
+                        {roles.map((role) => (
+                            <option key={role.id} value={role.id}>
                                 {role.name}
-                            </button>
+                            </option>
                         ))}
-                    </div>
-                    {errors.roles && (
-                        <p className="mt-1 text-xs text-destructive">{errors.roles.message}</p>
+                    </select>
+                    {errors.role_id && (
+                        <p className="text-xs text-destructive">{errors.role_id.message}</p>
                     )}
-                    {user && <p className="text-xs text-muted-foreground italic">Note: Role updates are not currently supported by the backend.</p>}
                 </div>
 
-                <div className="flex justify-end gap-2">
+                <div className="flex items-center space-x-2">
+                    <input
+                        type="checkbox"
+                        id="is_active"
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        {...register('is_active')}
+                    />
+                    <label htmlFor="is_active" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        Active Account
+                    </label>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
                     <Button type="button" variant="outline" onClick={onClose}>
                         Cancel
                     </Button>
@@ -315,6 +344,58 @@ const UserModal = ({
                     </Button>
                 </div>
             </form>
+        </Modal>
+    );
+};
+
+const HemisImportModal = ({
+    isOpen,
+    onClose,
+    onSuccess,
+    syncHemisMutation,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess: () => void;
+    syncHemisMutation: ReturnType<typeof useSyncHemisUsers>;
+}) => {
+    // Separate form for import if needed in future, currently just a confirmation/trigger
+    
+    // Using local state to manage loading state explicitly if needed or rely on mutation status
+    const isSubmitting = syncHemisMutation.isPending;
+
+    const handleImport = () => {
+        syncHemisMutation.mutate(undefined, {
+            onSuccess: () => {
+                onSuccess();
+            },
+            onError: (error: any) => {
+                console.error('Failed to sync', error);
+                alert('Failed to sync with Hemis');
+            }
+        });
+    };
+
+    return (
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Import from Hemis"
+        >
+            <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                    This will synchronize users, students, and other data from the Hemis system.
+                    This process might take a few moments.
+                </p>
+                <div className="flex justify-end gap-2 pt-4">
+                    <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
+                        Cancel
+                    </Button>
+                    <Button onClick={handleImport} isLoading={isSubmitting}>
+                        Start Import
+                    </Button>
+                </div>
+            </div>
         </Modal>
     );
 };

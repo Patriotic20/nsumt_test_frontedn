@@ -12,6 +12,7 @@ import {
     Layers,
     UsersRound,
     FileQuestion,
+    PlayCircle,
 } from 'lucide-react';
 import { cn } from '@/utils/utils';
 import { useAuth } from '@/context/AuthContext';
@@ -33,6 +34,7 @@ const Sidebar = () => {
         { name: 'Subjects', href: '/subjects', icon: BookOpen },
         { name: 'Questions', href: '/questions', icon: FileQuestion },
         { name: 'Quizzes', href: '/quizzes', icon: BookOpen },
+        { name: 'Take Quiz', href: '/quiz-test', icon: PlayCircle },
         { name: 'Results', href: '/results', icon: FileText },
     ];
 

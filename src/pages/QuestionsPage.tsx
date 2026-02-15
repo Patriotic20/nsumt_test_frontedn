@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { Pagination } from '@/components/ui/Pagination';
 import { useNavigate } from 'react-router-dom';
-import { questionService, type Question } from '@/services/questionService';
-import { subjectService, type Subject } from '@/services/subjectService';
-import { userService } from '@/services/userService';
-import type { User } from '@/types/auth';
+import type { Question } from '@/services/questionService';
+import type { Subject } from '@/services/subjectService';
 import { Button } from '@/components/ui/Button';
 import {
     Table,
@@ -17,67 +16,63 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Plus, Pencil, Trash2, Loader2, FileQuestion, Upload, FileUp } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useQuestions, useDeleteQuestion, useUploadQuestions } from '@/hooks/useQuestions';
+import { useSubjects } from '@/hooks/useSubjects';
+import { useUsers } from '@/hooks/useUsers';
 
 const QuestionsPage = () => {
     const navigate = useNavigate();
-    const [questions, setQuestions] = useState<Question[]>([]);
-    const [subjects, setSubjects] = useState<Subject[]>([]);
-    const [users, setUsers] = useState<User[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [currentPage, setCurrentPage] = useState(1);
+    const pageSize = 10;
+    
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [questionToDelete, setQuestionToDelete] = useState<Question | null>(null);
+    const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
-    const fetchData = async () => {
-        try {
-            setIsLoading(true);
-            const [questionsData, subjectsData, usersData] = await Promise.all([
-                questionService.getQuestions(),
-                subjectService.getSubjects(),
-                userService.getUsers(),
-            ]);
-            setQuestions(questionsData.questions || []);
-            setSubjects(subjectsData.subjects);
-            setUsers(usersData.users);
-        } catch (error) {
-            console.error('Failed to fetch data', error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    const { data: questionsData, isLoading: isQuestionsLoading } = useQuestions(currentPage, pageSize);
+    const { data: subjectsData } = useSubjects(1, 100);
+    const { data: usersData } = useUsers(1, 100);
+    const deleteQuestionMutation = useDeleteQuestion();
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+    const questions = questionsData?.questions || [];
+    const totalPages = questionsData ? Math.ceil(questionsData.total / pageSize) : 1;
+    const subjects = subjectsData?.subjects || [];
+    const users = usersData?.users || [];
 
     const handleCreateQuestion = () => {
         navigate('/questions/create');
     };
 
-    const handleEditQuestion = (question: Question) => {
+    const handleEditQuestion = (question: Question, e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent row click
         navigate(`/questions/${question.id}/edit`);
     };
 
-    const handleDeleteClick = (question: Question) => {
+    const handleDeleteClick = (question: Question, e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent row click
         setQuestionToDelete(question);
         setIsDeleteModalOpen(true);
     };
 
+    const handleViewQuestion = (question: Question) => {
+        setSelectedQuestion(question);
+        setIsDetailModalOpen(true);
+    };
+
     const handleConfirmDelete = async () => {
         if (!questionToDelete) return;
-        try {
-            await questionService.deleteQuestion(questionToDelete.id);
-            fetchData();
-            setIsDeleteModalOpen(false);
-            setQuestionToDelete(null);
-        } catch (error) {
-            console.error('Failed to delete question', error);
-        }
+        deleteQuestionMutation.mutate(questionToDelete.id, {
+            onSuccess: () => {
+                setIsDeleteModalOpen(false);
+                setQuestionToDelete(null);
+            },
+        });
     };
 
     const handleSuccess = () => {
         setIsUploadModalOpen(false);
-        fetchData();
     };
 
     const getSubjectName = (id?: number) => subjects.find(s => s.id === id)?.name || '-';
@@ -114,7 +109,7 @@ const QuestionsPage = () => {
                     <CardTitle>All Questions</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {isLoading ? (
+                    {isQuestionsLoading ? (
                         <div className="flex justify-center p-8">
                             <Loader2 className="h-8 w-8 animate-spin" />
                         </div>
@@ -137,12 +132,15 @@ const QuestionsPage = () => {
                                 {questions.map((question) => {
                                     const plainText = stripHtml(question.text);
                                     return (
-                                        <TableRow key={question.id}>
+                                        <TableRow 
+                                            key={question.id} 
+                                            className="cursor-pointer hover:bg-muted/50"
+                                            onClick={() => handleViewQuestion(question)}
+                                        >
                                             <TableCell className="font-medium">
                                                 <div
-                                                    className="break-words max-w-md cursor-pointer hover:underline"
+                                                    className="break-words max-w-md"
                                                     title={plainText}
-                                                    onClick={() => handleEditQuestion(question)}
                                                 >
                                                     {plainText.length > 100 ? `${plainText.substring(0, 100)}...` : plainText}
                                                 </div>
@@ -154,7 +152,7 @@ const QuestionsPage = () => {
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        onClick={() => handleEditQuestion(question)}
+                                                        onClick={(e) => handleEditQuestion(question, e)}
                                                     >
                                                         <Pencil className="h-4 w-4" />
                                                     </Button>
@@ -162,7 +160,7 @@ const QuestionsPage = () => {
                                                         variant="ghost"
                                                         size="sm"
                                                         className="text-destructive hover:text-destructive"
-                                                        onClick={() => handleDeleteClick(question)}
+                                                        onClick={(e) => handleDeleteClick(question, e)}
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>
@@ -177,11 +175,25 @@ const QuestionsPage = () => {
                 </CardContent>
             </Card>
 
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                isLoading={isQuestionsLoading}
+            />
+
             <UploadModal
                 isOpen={isUploadModalOpen}
                 onClose={() => setIsUploadModalOpen(false)}
                 onSuccess={handleSuccess}
                 subjects={subjects}
+            />
+
+            <QuestionDetailModal
+                isOpen={isDetailModalOpen}
+                onClose={() => setIsDetailModalOpen(false)}
+                question={selectedQuestion}
+                getSubjectName={getSubjectName}
             />
 
             <ConfirmDialog
@@ -194,6 +206,70 @@ const QuestionsPage = () => {
                 cancelText="Cancel"
             />
         </div>
+    );
+};
+
+const QuestionDetailModal = ({
+    isOpen,
+    onClose,
+    question,
+    getSubjectName,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    question: Question | null;
+    getSubjectName: (id?: number) => string;
+}) => {
+    if (!question) return null;
+
+    return (
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Question Details"
+        >
+            <div className="space-y-6">
+                <div className="space-y-2">
+                    <h3 className="text-sm font-medium text-muted-foreground">Question Body</h3>
+                    <div 
+                        className="rounded-lg border bg-muted/50 p-4 text-sm"
+                        dangerouslySetInnerHTML={{ __html: question.text }}
+                    />
+                </div>
+
+                <div className="space-y-3">
+                    <h3 className="text-sm font-medium text-muted-foreground">Options</h3>
+                    <div className="grid gap-3">
+                        {[
+                            { label: 'A', value: question.option_a },
+                            { label: 'B', value: question.option_b },
+                            { label: 'C', value: question.option_c },
+                            { label: 'D', value: question.option_d },
+                        ].map((option) => (
+                            <div key={option.label} className="flex gap-3 items-start">
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">
+                                    {option.label}
+                                </div>
+                                <div 
+                                    className="w-full rounded-lg border p-3 text-sm min-h-[3rem]"
+                                    dangerouslySetInnerHTML={{ __html: option.value }}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="pt-2 border-t mt-4">
+                     <p className="text-sm text-muted-foreground">
+                        Subject: <span className="font-medium text-foreground">{getSubjectName(question.subject_id)}</span>
+                    </p>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                    <Button onClick={onClose}>Close</Button>
+                </div>
+            </div>
+        </Modal>
     );
 };
 
@@ -210,7 +286,7 @@ const UploadModal = ({
 }) => {
     const [file, setFile] = useState<File | null>(null);
     const [subjectId, setSubjectId] = useState<string>('');
-    const [isUploading, setIsUploading] = useState(false);
+    const uploadMutation = useUploadQuestions();
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -218,18 +294,17 @@ const UploadModal = ({
         }
     };
 
-    const handleUpload = async () => {
+    const handleUpload = () => {
         if (!file || !subjectId) return;
-        try {
-            setIsUploading(true);
-            await questionService.uploadQuestions(file, parseInt(subjectId));
-            onSuccess();
-        } catch (error) {
-            console.error('Failed to upload file', error);
-            alert('Failed to upload file');
-        } finally {
-            setIsUploading(false);
-        }
+        uploadMutation.mutate({ file, subject_id: parseInt(subjectId) }, {
+            onSuccess: () => {
+                onSuccess();
+            },
+            onError: (error) => {
+                console.error('Failed to upload file', error);
+                alert('Failed to upload file');
+            }
+        });
     };
 
     return (
@@ -276,7 +351,7 @@ const UploadModal = ({
                 )}
                 <div className="flex justify-end gap-2">
                     <Button variant="outline" onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleUpload} isLoading={isUploading} disabled={!file || !subjectId}>
+                    <Button onClick={handleUpload} isLoading={uploadMutation.isPending} disabled={!file || !subjectId}>
                         Upload
                     </Button>
                 </div>

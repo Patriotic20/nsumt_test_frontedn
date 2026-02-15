@@ -22,6 +22,11 @@ export const facultyService = {
         return response.data;
     },
 
+    getFacultyById: async (id: number): Promise<Faculty> => {
+        const response = await api.get<Faculty>(`/faculty/${id}`);
+        return response.data;
+    },
+
     createFaculty: async (data: { name: string }) => {
         const response = await api.post('/faculty/', data);
         return response.data;

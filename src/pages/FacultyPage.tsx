@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Pagination } from '@/components/ui/Pagination';
 import { facultyService, type Faculty } from '@/services/facultyService';
 import { Button } from '@/components/ui/Button';
 import {
@@ -26,12 +27,16 @@ const FacultyPage = () => {
     const [selectedFaculty, setSelectedFaculty] = useState<Faculty | null>(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [facultyToDelete, setFacultyToDelete] = useState<Faculty | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const pageSize = 10;
 
     const fetchData = async () => {
         try {
             setIsLoading(true);
-            const data = await facultyService.getFaculties();
+            const data = await facultyService.getFaculties(currentPage, pageSize);
             setFaculties(data.faculties);
+            setTotalPages(Math.ceil(data.total / pageSize));
         } catch (error) {
             console.error('Failed to fetch faculties', error);
         } finally {
@@ -39,7 +44,7 @@ const FacultyPage = () => {
         }
     };
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => { fetchData(); }, [currentPage]);
 
     const handleDeleteClick = (faculty: Faculty) => {
         setFacultyToDelete(faculty);
@@ -128,6 +133,14 @@ const FacultyPage = () => {
                     )}
                 </CardContent>
             </Card>
+
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                isLoading={isLoading}
+            />
+
             <FacultyModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} faculty={selectedFaculty}
                 onSuccess={handleSuccess} />
             <ConfirmDialog

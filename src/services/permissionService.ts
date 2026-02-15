@@ -22,6 +22,11 @@ export const permissionService = {
         return response.data;
     },
 
+    getPermissionById: async (id: number): Promise<Permission> => {
+        const response = await api.get<Permission>(`/permission/${id}`);
+        return response.data;
+    },
+
     createPermission: async (data: { name: string }) => {
         const response = await api.post('/permission/', data);
         return response.data;

@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
-import { studentService, type Student, type StudentCreateRequest } from '@/services/studentService';
-import { groupService, type Group } from '@/services/groupService';
-import { userService } from '@/services/userService';
+import { useState, useEffect } from 'react';
+import { Pagination } from '@/components/ui/Pagination';
+import { type Student, type StudentCreateRequest } from '@/services/studentService';
+import { type Group } from '@/services/groupService';
 import type { User } from '@/types/auth';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -14,12 +14,15 @@ import {
     TableRow,
 } from '@/components/ui/Table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Plus, Pencil, Trash2, Loader2, User as UserIcon } from 'lucide-react';
+import { Pencil, Trash2, Loader2, User as UserIcon } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useStudents, useDeleteStudent, useCreateStudent, useUpdateStudent } from '@/hooks/useStudents';
+import { useGroups } from '@/hooks/useGroups';
+import { useUsers } from '@/hooks/useUsers';
 
 const studentSchema = z.object({
     first_name: z.string().min(1, 'First name is required'),
@@ -32,36 +35,29 @@ const studentSchema = z.object({
 type StudentFormValues = z.infer<typeof studentSchema>;
 
 const StudentsPage = () => {
-    const [students, setStudents] = useState<Student[]>([]);
-    const [groups, setGroups] = useState<Group[]>([]);
-    const [users, setUsers] = useState<User[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [detailStudent, setDetailStudent] = useState<Student | null>(null);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const pageSize = 10;
 
-    const fetchData = async () => {
-        try {
-            setIsLoading(true);
-            const [studentsData, groupsData, usersData] = await Promise.all([
-                studentService.getStudents(),
-                groupService.getGroups(),
-                userService.getUsers(),
-            ]);
-            setStudents(studentsData.students);
-            setGroups(groupsData.groups);
-            setUsers(usersData.users);
-        } catch (error) {
-            console.error('Failed to fetch data', error);
-        } finally {
-            setIsLoading(false);
-        }
+    const { data: studentsData, isLoading: isStudentsLoading } = useStudents(currentPage, pageSize);
+    const { data: groupsData } = useGroups(1, 100);
+    const { data: usersData } = useUsers(1, 100);
+    const deleteStudentMutation = useDeleteStudent();
+
+    const students = studentsData?.students || [];
+    const totalPages = studentsData ? Math.ceil(studentsData.total / pageSize) : 1;
+    const groups = groupsData?.groups || [];
+    const users = usersData?.users || [];
+
+    const handleRowClick = (student: Student) => {
+        setDetailStudent(student);
+        setIsDetailModalOpen(true);
     };
-
-    useEffect(() => {
-        fetchData();
-    }, []);
 
     const handleDeleteClick = (student: Student) => {
         setStudentToDelete(student);
@@ -70,20 +66,16 @@ const StudentsPage = () => {
 
     const handleConfirmDelete = async () => {
         if (!studentToDelete) return;
-        try {
-            await studentService.deleteStudent(studentToDelete.id);
-            setStudents((prev) => prev.filter((item) => item.id !== studentToDelete.id));
-            setIsDeleteModalOpen(false);
-            setStudentToDelete(null);
-        } catch (error) {
-            console.error('Failed to delete student', error);
-            fetchData(); // Refetch on error to ensure consistency
-        }
+        deleteStudentMutation.mutate(studentToDelete.id, {
+            onSuccess: () => {
+                setIsDeleteModalOpen(false);
+                setStudentToDelete(null);
+            },
+        });
     };
 
     const handleSuccess = () => {
         setIsModalOpen(false);
-        fetchData(); // Refetch to get updated list (including full names etc if server generated)
     };
 
     const getGroupName = (groupId: number) => {
@@ -97,6 +89,7 @@ const StudentsPage = () => {
                     <h1 className="text-3xl font-bold tracking-tight">Students</h1>
                     <p className="text-muted-foreground">Manage student records</p>
                 </div>
+                {/* Creation is disabled as per backend logic */}
             </div>
 
             <Card>
@@ -104,14 +97,14 @@ const StudentsPage = () => {
                     <CardTitle>All Students</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {isLoading ? (
+                    {isStudentsLoading ? (
                         <div className="flex justify-center p-8">
                             <Loader2 className="h-8 w-8 animate-spin" />
                         </div>
                     ) : students.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                             <UserIcon className="h-12 w-12 mb-4 opacity-20" />
-                            <p>No students found. Create one to get started.</p>
+                            <p>No students found. Import via Users page to get started.</p>
                         </div>
                     ) : (
                         <Table>
@@ -126,12 +119,16 @@ const StudentsPage = () => {
                             </TableHeader>
                             <TableBody>
                                 {students.map((student) => (
-                                    <TableRow key={student.id}>
+                                    <TableRow 
+                                        key={student.id} 
+                                        className="cursor-pointer hover:bg-muted/50"
+                                        onClick={() => handleRowClick(student)}
+                                    >
                                         <TableCell>{student.id}</TableCell>
                                         <TableCell className="font-medium">{student.full_name}</TableCell>
                                         <TableCell>{getGroupName(student.group_id)}</TableCell>
                                         <TableCell>{new Date(student.created_at).toLocaleDateString()}</TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                             <div className="flex justify-end gap-2">
                                                 <Button
                                                     variant="ghost"
@@ -157,6 +154,21 @@ const StudentsPage = () => {
                     )}
                 </CardContent>
             </Card>
+
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                isLoading={isStudentsLoading}
+            />
+
+            <StudentDetailModal
+                isOpen={isDetailModalOpen}
+                onClose={() => setIsDetailModalOpen(false)}
+                student={detailStudent}
+                getGroupName={getGroupName}
+                users={users}
+            />
 
             <StudentModal
                 isOpen={isModalOpen}
@@ -199,44 +211,62 @@ const StudentModal = ({
         register,
         handleSubmit,
         reset,
-        formState: { errors, isSubmitting },
+        formState: { errors, isSubmitting: isFormSubmitting },
     } = useForm<StudentFormValues>({
         resolver: zodResolver(studentSchema),
     });
 
+    const createMutation = useCreateStudent();
+    const updateMutation = useUpdateStudent();
+    const isSubmitting = isFormSubmitting || createMutation.isPending || updateMutation.isPending;
+
+    // ... (rest of the component logic for reset effect is same, but submitting logic changes)
     useEffect(() => {
         if (student) {
             reset({
                 first_name: student.first_name,
                 last_name: student.last_name,
                 third_name: student.third_name || '',
-                group_id: student.group_id.toString(), // Convert to string for select
-                user_id: student.user_id.toString(), // Convert to string for select
+                group_id: student.group_id.toString(),
+                user_id: student.user_id.toString(),
             });
         }
     }, [student, reset]);
 
-    const onSubmit = async (data: StudentFormValues) => {
-        try {
-            const payload: StudentCreateRequest = {
-                first_name: data.first_name,
-                last_name: data.last_name,
-                third_name: data.third_name || '',
-                group_id: parseInt(data.group_id, 10),
-                user_id: parseInt(data.user_id, 10),
-            };
+    const onSubmit = (data: StudentFormValues) => {
+        const payload: StudentCreateRequest = {
+            first_name: data.first_name,
+            last_name: data.last_name,
+            third_name: data.third_name || '',
+            group_id: parseInt(data.group_id, 10),
+            user_id: parseInt(data.user_id, 10),
+        };
 
-            if (student) {
-                await studentService.updateStudent(student.id, payload);
-                onSuccess();
-            }
-            onSuccess();
-        } catch (error) {
-            console.error('Failed to save student', error);
-            alert('Failed to save student');
+        if (student) {
+            updateMutation.mutate({ id: student.id, data: payload }, {
+                onSuccess: () => onSuccess(),
+                onError: (error) => {
+                    console.error('Failed to update student', error);
+                    alert('Failed to update student');
+                }
+            });
+        } else {
+             // Although creation is ostensibly disabled in UI, keeping logic here if enabled later
+             // or if I missed where it was disabled. The layout says "Creation is disabled".
+             // But if I were to implement it:
+             /*
+             createMutation.mutate(payload, {
+                onSuccess: () => onSuccess(),
+                onError: (error) => {
+                    console.error('Failed to create student', error);
+                    alert('Failed to create student');
+                }
+             });
+             */
         }
     };
-
+    
+    // ... (render)
     return (
         <Modal
             isOpen={isOpen}
@@ -244,6 +274,7 @@ const StudentModal = ({
             title="Edit Student"
         >
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+               {/* Inputs ... */}
                 <div className="grid grid-cols-2 gap-4">
                     <Input
                         label="First Name"
@@ -308,6 +339,76 @@ const StudentModal = ({
                     </Button>
                 </div>
             </form>
+        </Modal>
+    );
+};
+
+const StudentDetailModal = ({
+    isOpen,
+    onClose,
+    student,
+    getGroupName,
+    users,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    student: Student | null;
+    getGroupName: (id: number) => string;
+    users: User[];
+}) => {
+    if (!student) return null;
+
+    const getUserName = (userId: number) => {
+        return users.find(u => u.id === userId)?.username || 'Unknown User';
+    };
+
+    return (
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Student Details"
+        >
+            <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="text-sm font-medium text-muted-foreground">ID</label>
+                        <p className="text-base">{student.id}</p>
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-muted-foreground">Full Name</label>
+                        <p className="text-base font-medium">{student.full_name}</p>
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-muted-foreground">First Name</label>
+                        <p className="text-base">{student.first_name}</p>
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-muted-foreground">Last Name</label>
+                        <p className="text-base">{student.last_name}</p>
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-muted-foreground">Third Name</label>
+                        <p className="text-base">{student.third_name || '-'}</p>
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-muted-foreground">Group</label>
+                        <p className="text-base">{getGroupName(student.group_id)}</p>
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-muted-foreground">User Account</label>
+                        <p className="text-base">{getUserName(student.user_id)}</p>
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-muted-foreground">Created At</label>
+                        <p className="text-base">{new Date(student.created_at).toLocaleString()}</p>
+                    </div>
+                </div>
+                <div className="flex justify-end pt-4">
+                    <Button variant="outline" onClick={onClose}>
+                        Close
+                    </Button>
+                </div>
+            </div>
         </Modal>
     );
 };

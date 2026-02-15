@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Pagination } from '@/components/ui/Pagination';
 import { roleService, type Role } from '@/services/roleService';
 import { Button } from '@/components/ui/Button';
 import {
@@ -27,12 +28,16 @@ const RolesPage = () => {
     const [selectedRole, setSelectedRole] = useState<Role | null>(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const pageSize = 10;
 
     const fetchData = async () => {
         try {
             setIsLoading(true);
-            const data = await roleService.getRoles();
+            const data = await roleService.getRoles(currentPage, pageSize);
             setRoles(data.roles);
+            setTotalPages(Math.ceil(data.total / pageSize));
         } catch (error) {
             console.error('Failed to fetch roles', error);
         } finally {
@@ -40,7 +45,7 @@ const RolesPage = () => {
         }
     };
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => { fetchData(); }, [currentPage]);
 
     const handleDeleteClick = (role: Role) => {
         setRoleToDelete(role);
@@ -129,6 +134,14 @@ const RolesPage = () => {
                     )}
                 </CardContent>
             </Card>
+
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                isLoading={isLoading}
+            />
+
             <RoleModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} role={selectedRole}
                 onSuccess={handleSuccess} />
             <ConfirmDialog

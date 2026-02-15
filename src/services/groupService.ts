@@ -23,6 +23,11 @@ export const groupService = {
         return response.data;
     },
 
+    getGroupById: async (id: number): Promise<Group> => {
+        const response = await api.get<Group>(`/group/${id}`);
+        return response.data;
+    },
+
     createGroup: async (data: { name: string; faculty_id: number }) => {
         const response = await api.post('/group/', data);
         return response.data;

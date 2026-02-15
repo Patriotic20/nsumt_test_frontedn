@@ -22,6 +22,11 @@ export const roleService = {
         return response.data;
     },
 
+    getRoleById: async (id: number): Promise<Role> => {
+        const response = await api.get<Role>(`/role/${id}`);
+        return response.data;
+    },
+
     createRole: async (data: { name: string }) => {
         const response = await api.post('/role/', data);
         return response.data;

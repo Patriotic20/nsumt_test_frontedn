@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Pagination } from '@/components/ui/Pagination';
 import { permissionService, type Permission } from '@/services/permissionService';
 import { Button } from '@/components/ui/Button';
 import {
@@ -27,12 +28,16 @@ const PermissionsPage = () => {
     const [selectedPermission, setSelectedPermission] = useState<Permission | null>(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [permissionToDelete, setPermissionToDelete] = useState<Permission | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const pageSize = 10;
 
     const fetchData = async () => {
         try {
             setIsLoading(true);
-            const data = await permissionService.getPermissions();
+            const data = await permissionService.getPermissions(currentPage, pageSize);
             setPermissions(data.permissions);
+            setTotalPages(Math.ceil(data.total / pageSize));
         } catch (error) {
             console.error('Failed to fetch permissions', error);
         } finally {
@@ -40,7 +45,7 @@ const PermissionsPage = () => {
         }
     };
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => { fetchData(); }, [currentPage]);
 
     const handleDeleteClick = (permission: Permission) => {
         setPermissionToDelete(permission);
@@ -129,6 +134,14 @@ const PermissionsPage = () => {
                     )}
                 </CardContent>
             </Card>
+
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                isLoading={isLoading}
+            />
+
             <PermissionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} permission={selectedPermission}
                 onSuccess={handleSuccess} />
             <ConfirmDialog
