@@ -28,6 +28,12 @@ export const CardTitle: React.FC<React.HTMLAttributes<HTMLHeadingElement>> = ({ 
     </h3>
 );
 
+export const CardDescription: React.FC<React.HTMLAttributes<HTMLParagraphElement>> = ({ className, children, ...props }) => (
+    <p className={cn("text-sm text-muted-foreground", className)} {...props}>
+        {children}
+    </p>
+);
+
 export const CardContent: React.FC<CardProps> = ({ className, children, ...props }) => (
     <div className={cn("p-6 pt-0", className)} {...props}>
         {children}

@@ -1,8 +1,10 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { ThemeProvider } from '@/context/ThemeContext';
 import Login from '@/pages/Login';
 import MainLayout from '@/components/layout/MainLayout';
 import Dashboard from '@/pages/Dashboard';
+import ProfilePage from '@/pages/ProfilePage';
 import UsersPage from '@/pages/UsersPage';
 import QuizzesPage from '@/pages/QuizzesPage';
 import ResultsPage from '@/pages/ResultsPage';
@@ -45,36 +47,42 @@ const DashboardRedirect = () => {
 
 function App() {
   return (
-    <Router>
+    <ThemeProvider>
       <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<Login />} />
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
 
-          <Route element={<ProtectedRoute />}>
-            <Route element={<MainLayout />}>
-              <Route path="/" element={<DashboardRedirect />} />
-              <Route path="/users" element={<UsersPage />} />
-              <Route path="/teachers" element={<TeachersPage />} />
-              <Route path="/roles" element={<RolesPage />} />
-              <Route path="/permissions" element={<PermissionsPage />} />
-              <Route path="/faculties" element={<FacultyPage />} />
-              <Route path="/kafedras" element={<KafedraPage />} />
-              <Route path="/groups" element={<GroupsPage />} />
-              <Route path="/students" element={<StudentsPage />} />
-              <Route path="/questions" element={<QuestionsPage />} />
-              <Route path="/questions/create" element={<QuestionFormPage />} />
-              <Route path="/questions/:id/edit" element={<QuestionFormPage />} />
-              <Route path="/subjects" element={<SubjectsPage />} />
-              <Route path="/quizzes" element={<QuizzesPage />} />
-              <Route path="/quiz-test" element={<QuizTestPage />} />
-              <Route path="/results" element={<ResultsPage />} />
+            <Route element={<ProtectedRoute />}>
+              <Route element={<MainLayout />}>
+                <Route path="/" element={<DashboardRedirect />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/users" element={<UsersPage />} />
+                <Route path="/teachers" element={<TeachersPage />} />
+                <Route path="/subjects" element={<SubjectsPage />} />
+
+                <Route path="/quiz-test" element={<QuizTestPage />} />
+                <Route path="/results" element={<ResultsPage />} />
+
+                <Route path="/roles" element={<RolesPage />} />
+                <Route path="/permissions" element={<PermissionsPage />} />
+                <Route path="/faculties" element={<FacultyPage />} />
+                <Route path="/kafedras" element={<KafedraPage />} />
+                <Route path="/groups" element={<GroupsPage />} />
+                <Route path="/students" element={<StudentsPage />} />
+                <Route path="/questions" element={<QuestionsPage />} />
+                <Route path="/questions/create" element={<QuestionFormPage />} />
+                <Route path="/questions/:id/edit" element={<QuestionFormPage />} />
+                <Route path="/quizzes" element={<QuizzesPage />} />
+              </Route>
             </Route>
-          </Route>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Router>
       </AuthProvider>
-    </Router>
+    </ThemeProvider>
   );
 }
 

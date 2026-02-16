@@ -5,7 +5,6 @@ import {
     BookOpen,
     FileText,
     BarChart,
-    LogOut,
     Shield,
     Key,
     Building2,
@@ -19,7 +18,7 @@ import { useAuth } from '@/context/AuthContext';
 
 const Sidebar = () => {
     const location = useLocation();
-    const { user, logout } = useAuth();
+    const { user } = useAuth();
 
     const isStudent = user?.roles?.some(role => role.name.toLowerCase() === 'student');
 
@@ -48,9 +47,11 @@ const Sidebar = () => {
         : [...basicNavigation, ...studentNavigation];
 
     return (
-        <div className="flex h-screen w-64 flex-col border-r bg-card">
+        <div className="flex h-screen w-64 flex-col border-r bg-card transition-colors duration-300">
             <div className="flex h-16 items-center border-b px-6">
-                <span className="text-xl font-bold">NSUMT Admin</span>
+                <span className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                    NSUMT Admin
+                </span>
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-4">
@@ -62,9 +63,9 @@ const Sidebar = () => {
                                 key={item.name}
                                 to={item.href}
                                 className={cn(
-                                    "flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                                    "flex items-center rounded-md px-3 py-2 text-sm font-medium transition-all duration-200",
                                     isActive
-                                        ? "bg-primary text-primary-foreground"
+                                        ? "bg-primary text-primary-foreground shadow-md"
                                         : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                                 )}
                             >
@@ -74,16 +75,6 @@ const Sidebar = () => {
                         );
                     })}
                 </nav>
-            </div>
-
-            <div className="border-t p-4">
-                <button
-                    onClick={logout}
-                    className="flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10"
-                >
-                    <LogOut className="mr-3 h-5 w-5" />
-                    Logout
-                </button>
             </div>
         </div>
     );
