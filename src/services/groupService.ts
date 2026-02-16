@@ -16,9 +16,9 @@ export interface GroupListResponse {
 }
 
 export const groupService = {
-    getGroups: async (page = 1, limit = 100) => {
+    getGroups: async (page = 1, limit = 100, name?: string) => {
         const response = await api.get<GroupListResponse>('/group/', {
-            params: { page, limit },
+            params: { page, limit, name },
         });
         return response.data;
     },

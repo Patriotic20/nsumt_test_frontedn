@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Pagination } from '@/components/ui/Pagination';
 import { useNavigate } from 'react-router-dom';
 import type { Question } from '@/services/questionService';
@@ -13,25 +13,36 @@ import {
     TableRow,
 } from '@/components/ui/Table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Plus, Pencil, Trash2, Loader2, FileQuestion, Upload, FileUp } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, FileQuestion, Upload, FileUp, Search } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useQuestions, useDeleteQuestion, useUploadQuestions } from '@/hooks/useQuestions';
 import { useSubjects } from '@/hooks/useSubjects';
 import { useUsers } from '@/hooks/useUsers';
+import { Input } from '@/components/ui/Input';
 
 const QuestionsPage = () => {
     const navigate = useNavigate();
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 10;
-    
+
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [questionToDelete, setQuestionToDelete] = useState<Question | null>(null);
     const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
 
-    const { data: questionsData, isLoading: isQuestionsLoading } = useQuestions(currentPage, pageSize);
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setCurrentPage(1);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    const { data: questionsData, isLoading: isQuestionsLoading } = useQuestions(currentPage, pageSize, debouncedSearch);
     const { data: subjectsData } = useSubjects(1, 100);
     const { data: usersData } = useUsers(1, 100);
     const deleteQuestionMutation = useDeleteQuestion();
@@ -93,6 +104,15 @@ const QuestionsPage = () => {
                     <p className="text-muted-foreground">Manage exam questions</p>
                 </div>
                 <div className="flex gap-2">
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search questions..."
+                            className="pl-8 w-[250px]"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
                     <Button variant="outline" onClick={() => setIsUploadModalOpen(true)}>
                         <Upload className="mr-2 h-4 w-4" />
                         Import Excel
@@ -132,8 +152,8 @@ const QuestionsPage = () => {
                                 {questions.map((question) => {
                                     const plainText = stripHtml(question.text);
                                     return (
-                                        <TableRow 
-                                            key={question.id} 
+                                        <TableRow
+                                            key={question.id}
                                             className="cursor-pointer hover:bg-muted/50"
                                             onClick={() => handleViewQuestion(question)}
                                         >
@@ -231,7 +251,7 @@ const QuestionDetailModal = ({
             <div className="space-y-6">
                 <div className="space-y-2">
                     <h3 className="text-sm font-medium text-muted-foreground">Question Body</h3>
-                    <div 
+                    <div
                         className="rounded-lg border bg-muted/50 p-4 text-sm"
                         dangerouslySetInnerHTML={{ __html: question.text }}
                     />
@@ -250,7 +270,7 @@ const QuestionDetailModal = ({
                                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">
                                     {option.label}
                                 </div>
-                                <div 
+                                <div
                                     className="w-full rounded-lg border p-3 text-sm min-h-[3rem]"
                                     dangerouslySetInnerHTML={{ __html: option.value }}
                                 />
@@ -260,7 +280,7 @@ const QuestionDetailModal = ({
                 </div>
 
                 <div className="pt-2 border-t mt-4">
-                     <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                         Subject: <span className="font-medium text-foreground">{getSubjectName(question.subject_id)}</span>
                     </p>
                 </div>

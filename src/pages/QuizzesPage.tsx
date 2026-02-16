@@ -14,7 +14,7 @@ import {
     TableRow,
 } from '@/components/ui/Table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Plus, Pencil, Trash2, Loader2, BookOpen } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, BookOpen, Search } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/Input';
@@ -48,8 +48,18 @@ const QuizzesPage = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 10;
     const [isUpdatingStatus, setIsUpdatingStatus] = useState<number | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
 
-    const { data: quizzesData, isLoading: isQuizzesLoading } = useQuizzes(currentPage, pageSize);
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setCurrentPage(1);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    const { data: quizzesData, isLoading: isQuizzesLoading } = useQuizzes(currentPage, pageSize, debouncedSearch);
     const { data: subjectsData } = useSubjects(1, 100);
     const { data: groupsData } = useGroups(1, 100);
     const { data: usersData } = useUsers(1, 100);
@@ -104,11 +114,11 @@ const QuizzesPage = () => {
             subject_id: quiz.subject_id || undefined,
             is_active: !quiz.is_active,
         };
-        
+
         // Note: The backend expects specific types, here we assume update handles partial or full updates
         // However, looking at the schema, it seems we might need to send all fields.
         // We are using the same payload structure.
-        
+
         updateQuizMutation.mutate({ id: quiz.id, data: payload }, {
             onSettled: () => {
                 setIsUpdatingStatus(null);
@@ -130,10 +140,21 @@ const QuizzesPage = () => {
                     <h1 className="text-3xl font-bold tracking-tight">Quizzes</h1>
                     <p className="text-muted-foreground">Manage quizzes and tests</p>
                 </div>
-                <Button onClick={handleCreateQuiz}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Quiz
-                </Button>
+                <div className="flex gap-2">
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search quizzes..."
+                            className="pl-8 w-[250px]"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    <Button onClick={handleCreateQuiz}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Create Quiz
+                    </Button>
+                </div>
             </div>
 
             <Card>

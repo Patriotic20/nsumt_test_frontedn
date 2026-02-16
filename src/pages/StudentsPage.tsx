@@ -14,7 +14,7 @@ import {
     TableRow,
 } from '@/components/ui/Table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Pencil, Trash2, Loader2, User as UserIcon } from 'lucide-react';
+import { Pencil, Trash2, Loader2, User as UserIcon, Search } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { useForm } from 'react-hook-form';
@@ -42,9 +42,19 @@ const StudentsPage = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [detailStudent, setDetailStudent] = useState<Student | null>(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const pageSize = 10;
 
-    const { data: studentsData, isLoading: isStudentsLoading } = useStudents(currentPage, pageSize);
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setCurrentPage(1);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    const { data: studentsData, isLoading: isStudentsLoading } = useStudents(currentPage, pageSize, debouncedSearch);
     const { data: groupsData } = useGroups(1, 100);
     const { data: usersData } = useUsers(1, 100);
     const deleteStudentMutation = useDeleteStudent();
@@ -89,7 +99,17 @@ const StudentsPage = () => {
                     <h1 className="text-3xl font-bold tracking-tight">Students</h1>
                     <p className="text-muted-foreground">Manage student records</p>
                 </div>
-                {/* Creation is disabled as per backend logic */}
+                <div className="flex gap-2">
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search students..."
+                            className="pl-8 w-[250px]"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                </div>
             </div>
 
             <Card>
@@ -119,8 +139,8 @@ const StudentsPage = () => {
                             </TableHeader>
                             <TableBody>
                                 {students.map((student) => (
-                                    <TableRow 
-                                        key={student.id} 
+                                    <TableRow
+                                        key={student.id}
                                         className="cursor-pointer hover:bg-muted/50"
                                         onClick={() => handleRowClick(student)}
                                     >
@@ -251,21 +271,21 @@ const StudentModal = ({
                 }
             });
         } else {
-             // Although creation is ostensibly disabled in UI, keeping logic here if enabled later
-             // or if I missed where it was disabled. The layout says "Creation is disabled".
-             // But if I were to implement it:
-             /*
-             createMutation.mutate(payload, {
-                onSuccess: () => onSuccess(),
-                onError: (error) => {
-                    console.error('Failed to create student', error);
-                    alert('Failed to create student');
-                }
-             });
-             */
+            // Although creation is ostensibly disabled in UI, keeping logic here if enabled later
+            // or if I missed where it was disabled. The layout says "Creation is disabled".
+            // But if I were to implement it:
+            /*
+            createMutation.mutate(payload, {
+               onSuccess: () => onSuccess(),
+               onError: (error) => {
+                   console.error('Failed to create student', error);
+                   alert('Failed to create student');
+               }
+            });
+            */
         }
     };
-    
+
     // ... (render)
     return (
         <Modal
@@ -274,7 +294,7 @@ const StudentModal = ({
             title="Edit Student"
         >
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-               {/* Inputs ... */}
+                {/* Inputs ... */}
                 <div className="grid grid-cols-2 gap-4">
                     <Input
                         label="First Name"

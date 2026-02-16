@@ -19,9 +19,11 @@ import { useAuth } from '@/context/AuthContext';
 
 const Sidebar = () => {
     const location = useLocation();
-    const { logout } = useAuth();
+    const { user, logout } = useAuth();
 
-    const navigation = [
+    const isStudent = user?.roles?.some(role => role.name.toLowerCase() === 'student');
+
+    const basicNavigation = [
         { name: 'Dashboard', href: '/', icon: BarChart },
         { name: 'Users', href: '/users', icon: Users },
         { name: 'Teachers', href: '/teachers', icon: GraduationCap },
@@ -34,9 +36,16 @@ const Sidebar = () => {
         { name: 'Subjects', href: '/subjects', icon: BookOpen },
         { name: 'Questions', href: '/questions', icon: FileQuestion },
         { name: 'Quizzes', href: '/quizzes', icon: BookOpen },
+    ];
+
+    const studentNavigation = [
         { name: 'Take Quiz', href: '/quiz-test', icon: PlayCircle },
         { name: 'Results', href: '/results', icon: FileText },
     ];
+
+    const navigation = isStudent
+        ? studentNavigation
+        : [...basicNavigation, ...studentNavigation];
 
     return (
         <div className="flex h-screen w-64 flex-col border-r bg-card">
@@ -73,7 +82,7 @@ const Sidebar = () => {
                     className="flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10"
                 >
                     <LogOut className="mr-3 h-5 w-5" />
-                    Sign out
+                    Logout
                 </button>
             </div>
         </div>

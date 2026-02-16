@@ -6,7 +6,7 @@ import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/Table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Search } from 'lucide-react';
 
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -30,12 +30,14 @@ const RolesPage = () => {
     const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const pageSize = 10;
 
     const fetchData = async () => {
         try {
             setIsLoading(true);
-            const data = await roleService.getRoles(currentPage, pageSize);
+            const data = await roleService.getRoles(currentPage, pageSize, debouncedSearch);
             setRoles(data.roles);
             setTotalPages(Math.ceil(data.total / pageSize));
         } catch (error) {
@@ -45,7 +47,15 @@ const RolesPage = () => {
         }
     };
 
-    useEffect(() => { fetchData(); }, [currentPage]);
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setCurrentPage(1);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    useEffect(() => { fetchData(); }, [currentPage, debouncedSearch]);
 
     const handleDeleteClick = (role: Role) => {
         setRoleToDelete(role);
@@ -84,10 +94,21 @@ const RolesPage = () => {
                     <h1 className="text-3xl font-bold tracking-tight">Roles</h1>
                     <p className="text-muted-foreground">Manage system roles</p>
                 </div>
-                <Button onClick={() => { setSelectedRole(null); setIsModalOpen(true); }}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Role
-                </Button>
+                <div className="flex gap-2">
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search roles..."
+                            className="pl-8 w-[250px]"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    <Button onClick={() => { setSelectedRole(null); setIsModalOpen(true); }}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Role
+                    </Button>
+                </div>
             </div>
             <Card>
                 <CardHeader><CardTitle>All Roles</CardTitle></CardHeader>

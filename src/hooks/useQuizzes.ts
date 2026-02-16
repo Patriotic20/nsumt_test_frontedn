@@ -1,10 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { quizService, type QuizCreateRequest } from '@/services/quizService';
 
-export const useQuizzes = (page = 1, limit = 10) => {
+export const useQuizzes = (page = 1, limit = 10, title?: string, is_active?: boolean) => {
     return useQuery({
-        queryKey: ['quizzes', page, limit],
-        queryFn: () => quizService.getQuizzes(page, limit),
+        queryKey: ['quizzes', page, limit, title, is_active],
+        queryFn: () => quizService.getQuizzes(page, limit, title, is_active),
         placeholderData: (previousData) => previousData,
     });
 };

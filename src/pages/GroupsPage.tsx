@@ -7,7 +7,7 @@ import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/Table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Search } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/Input';
@@ -30,9 +30,19 @@ const GroupsPage = () => {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const pageSize = 10;
 
-    const { data: groupsData, isLoading: isGroupsLoading } = useGroups(currentPage, pageSize);
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setCurrentPage(1);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    const { data: groupsData, isLoading: isGroupsLoading } = useGroups(currentPage, pageSize, debouncedSearch);
     const { data: facultiesData } = useFaculties();
     const deleteGroupMutation = useDeleteGroup();
 
@@ -72,10 +82,21 @@ const GroupsPage = () => {
                     <h1 className="text-3xl font-bold tracking-tight">Groups</h1>
                     <p className="text-muted-foreground">Manage student groups</p>
                 </div>
-                <Button onClick={() => { setSelectedGroup(null); setIsModalOpen(true); }}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Group
-                </Button>
+                <div className="flex gap-2">
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search groups..."
+                            className="pl-8 w-[250px]"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    <Button onClick={() => { setSelectedGroup(null); setIsModalOpen(true); }}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Group
+                    </Button>
+                </div>
             </div>
             <Card>
                 <CardHeader><CardTitle>All Groups</CardTitle></CardHeader>

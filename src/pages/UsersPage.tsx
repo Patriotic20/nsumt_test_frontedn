@@ -12,7 +12,7 @@ import {
     TableRow,
 } from '@/components/ui/Table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Plus, Pencil, Trash2, Loader2, Download } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Download, Search } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { useForm } from 'react-hook-form';
@@ -38,9 +38,20 @@ const UsersPage = () => {
     const [userToDelete, setUserToDelete] = useState<User | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [isHemisImportOpen, setIsHemisImportOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const pageSize = 10;
 
-    const { data: usersData, isLoading: isUsersLoading } = useUsers(currentPage, pageSize);
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setCurrentPage(1); // Reset to first page on search
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    const { data: usersData, isLoading: isUsersLoading } = useUsers(currentPage, pageSize, debouncedSearch);
     const { data: rolesData } = useRoles();
     const deleteUserMutation = useDeleteUser();
     const syncHemisMutation = useSyncHemisUsers();
@@ -86,6 +97,15 @@ const UsersPage = () => {
                     <p className="text-muted-foreground">Manage system users</p>
                 </div>
                 <div className="flex gap-2">
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search users..."
+                            className="pl-8 w-[250px]"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
                     <Button variant="outline" onClick={() => setIsHemisImportOpen(true)}>
                         <Download className="mr-2 h-4 w-4" />
                         Import from Hemis
@@ -133,11 +153,10 @@ const UsersPage = () => {
                                             </span>
                                         </TableCell>
                                         <TableCell>
-                                            <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
-                                                user.is_active
-                                                    ? 'border-transparent bg-primary text-primary-foreground hover:bg-primary/80'
-                                                    : 'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                                            }`}>
+                                            <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${user.is_active
+                                                ? 'border-transparent bg-primary text-primary-foreground hover:bg-primary/80'
+                                                : 'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                                                }`}>
                                                 {user.is_active ? 'Active' : 'Inactive'}
                                             </span>
                                         </TableCell>
@@ -297,7 +316,7 @@ const UserModal = ({
                     {...register('username')}
                     error={errors.username?.message}
                 />
-                
+
                 <Input
                     label={user ? "Password (leave blank to keep current)" : "Password"}
                     type="password"
@@ -360,7 +379,7 @@ const HemisImportModal = ({
     syncHemisMutation: ReturnType<typeof useSyncHemisUsers>;
 }) => {
     // Separate form for import if needed in future, currently just a confirmation/trigger
-    
+
     // Using local state to manage loading state explicitly if needed or rely on mutation status
     const isSubmitting = syncHemisMutation.isPending;
 

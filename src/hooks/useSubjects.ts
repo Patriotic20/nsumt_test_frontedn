@@ -1,10 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { subjectService } from '@/services/subjectService';
 
-export const useSubjects = (page = 1, limit = 100) => {
+export const useSubjects = (page = 1, limit = 100, name?: string) => {
     return useQuery({
-        queryKey: ['subjects', page, limit],
-        queryFn: () => subjectService.getSubjects(page, limit),
+        queryKey: ['subjects', page, limit, name],
+        queryFn: () => subjectService.getSubjects(page, limit, name),
     });
 };
 

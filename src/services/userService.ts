@@ -9,9 +9,9 @@ export interface UserListResponse {
 }
 
 export const userService = {
-    getUsers: async (page = 1, limit = 10) => {
+    getUsers: async (page = 1, limit = 10, username?: string) => {
         const response = await api.get<UserListResponse>('/user/', {
-            params: { page, limit },
+            params: { page, limit, username },
         });
         return response.data;
     },

@@ -28,9 +28,9 @@ export interface StudentListResponse {
 }
 
 export const studentService = {
-    getStudents: async (page = 1, limit = 10) => {
+    getStudents: async (page = 1, limit = 10, full_name?: string) => {
         const response = await api.get<StudentListResponse>('/students/', {
-            params: { page, limit },
+            params: { page, limit, full_name },
         });
         return response.data;
     },

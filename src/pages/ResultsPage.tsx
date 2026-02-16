@@ -12,11 +12,17 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Loader2, FileText } from 'lucide-react';
 
+import { useAuth } from '@/context/AuthContext';
+
 const ResultsPage = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 10;
+    const { user } = useAuth();
 
-    const { data: resultsData, isLoading: isResultsLoading } = useResults(currentPage, pageSize);
+    const isStudent = user?.roles?.some(role => role.name.toLowerCase() === 'student');
+    const userId = isStudent ? user?.id : undefined;
+
+    const { data: resultsData, isLoading: isResultsLoading } = useResults(currentPage, pageSize, userId);
 
     const results = resultsData?.results || [];
     const totalPages = resultsData ? Math.ceil(resultsData.total / pageSize) : 1;
@@ -66,14 +72,14 @@ const ResultsPage = () => {
                                         <TableCell>{result.quiz?.title || `Quiz ${result.quiz_id}`}</TableCell>
                                         <TableCell>
                                             <span className={
-                                                result.score >= 80 ? "text-green-600 font-medium" :
-                                                    result.score >= 50 ? "text-yellow-600" :
+                                                result.grade >= 80 ? "text-green-600 font-medium" :
+                                                    result.grade >= 50 ? "text-yellow-600" :
                                                         "text-red-600"
                                             }>
-                                                {result.score}%
+                                                {result.grade}%
                                             </span>
                                         </TableCell>
-                                        <TableCell>{result.correct_answers} / {result.total_questions}</TableCell>
+                                        <TableCell>{result.correct_answers} / {result.correct_answers + result.wrong_answers}</TableCell>
                                         <TableCell>{new Date(result.created_at).toLocaleDateString()}</TableCell>
                                     </TableRow>
                                 ))}

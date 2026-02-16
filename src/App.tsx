@@ -32,6 +32,17 @@ const ProtectedRoute = () => {
   return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
 };
 
+const DashboardRedirect = () => {
+  const { user } = useAuth();
+  const isStudent = user?.roles?.some(role => role.name.toLowerCase() === 'student');
+
+  if (isStudent) {
+    return <Navigate to="/quiz-test" replace />;
+  }
+
+  return <Dashboard />;
+};
+
 function App() {
   return (
     <Router>
@@ -41,7 +52,7 @@ function App() {
 
           <Route element={<ProtectedRoute />}>
             <Route element={<MainLayout />}>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/" element={<DashboardRedirect />} />
               <Route path="/users" element={<UsersPage />} />
               <Route path="/teachers" element={<TeachersPage />} />
               <Route path="/roles" element={<RolesPage />} />

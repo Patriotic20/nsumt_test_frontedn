@@ -4,11 +4,13 @@ import type { Quiz } from '@/services/quizService';
 
 export interface Result {
     id: number;
-    score: number;
-    total_questions: number;
+    grade: number;
     correct_answers: number;
+    wrong_answers: number;
     quiz_id: number;
     user_id: number;
+    subject_id?: number;
+    group_id?: number;
     created_at: string;
     user?: User;
     quiz?: Quiz;
@@ -30,8 +32,8 @@ export const resultService = {
     },
 
     getUserResults: async (userId: number, page = 1, limit = 10) => {
-        const response = await api.get<ResultListResponse>(`/result/user/${userId}`, {
-            params: { page, limit },
+        const response = await api.get<ResultListResponse>('/result/', {
+            params: { page, limit, user_id: userId },
         });
         return response.data;
     },

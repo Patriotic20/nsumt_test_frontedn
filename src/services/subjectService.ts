@@ -15,9 +15,9 @@ export interface SubjectListResponse {
 }
 
 export const subjectService = {
-    getSubjects: async (page = 1, limit = 100) => {
+    getSubjects: async (page = 1, limit = 100, name?: string) => {
         const response = await api.get<SubjectListResponse>('/subject/', {
-            params: { page, limit },
+            params: { page, limit, name },
         });
         return response.data;
     },

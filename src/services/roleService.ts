@@ -15,9 +15,9 @@ export interface RoleListResponse {
 }
 
 export const roleService = {
-    getRoles: async (page = 1, limit = 100) => {
+    getRoles: async (page = 1, limit = 100, name?: string) => {
         const response = await api.get<RoleListResponse>('/role/', {
-            params: { page, limit },
+            params: { page, limit, name },
         });
         return response.data;
     },

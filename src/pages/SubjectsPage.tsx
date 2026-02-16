@@ -12,7 +12,7 @@ import {
     TableRow,
 } from '@/components/ui/Table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Plus, Pencil, Trash2, Loader2, BookOpen } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, BookOpen, Search } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { useForm } from 'react-hook-form';
@@ -32,9 +32,19 @@ const SubjectsPage = () => {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [subjectToDelete, setSubjectToDelete] = useState<Subject | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const pageSize = 10;
 
-    const { data: subjectsData, isLoading: isSubjectsLoading } = useSubjects(currentPage, pageSize);
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setCurrentPage(1);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    const { data: subjectsData, isLoading: isSubjectsLoading } = useSubjects(currentPage, pageSize, debouncedSearch);
     const deleteSubjectMutation = useDeleteSubject();
 
     const subjects = subjectsData?.subjects || [];
@@ -67,10 +77,21 @@ const SubjectsPage = () => {
                     <h1 className="text-3xl font-bold tracking-tight">Subjects</h1>
                     <p className="text-muted-foreground">Manage subjects</p>
                 </div>
-                <Button onClick={() => { setSelectedSubject(null); setIsModalOpen(true); }}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Subject
-                </Button>
+                <div className="flex gap-2">
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search subjects..."
+                            className="pl-8 w-[250px]"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    <Button onClick={() => { setSelectedSubject(null); setIsModalOpen(true); }}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Subject
+                    </Button>
+                </div>
             </div>
 
             <Card>

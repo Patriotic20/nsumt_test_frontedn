@@ -7,7 +7,7 @@ import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/Table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Search } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/Input';
@@ -32,13 +32,15 @@ const KafedraPage = () => {
     const [kafedraToDelete, setKafedraToDelete] = useState<Kafedra | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const pageSize = 10;
 
     const fetchData = async () => {
         try {
             setIsLoading(true);
             const [kafedrasData, facultiesData] = await Promise.all([
-                kafedraService.getKafedras(currentPage, pageSize),
+                kafedraService.getKafedras(currentPage, pageSize, debouncedSearch),
                 facultyService.getFaculties(),
             ]);
             setKafedras(kafedrasData.kafedras);
@@ -51,7 +53,15 @@ const KafedraPage = () => {
         }
     };
 
-    useEffect(() => { fetchData(); }, [currentPage]);
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setCurrentPage(1);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    useEffect(() => { fetchData(); }, [currentPage, debouncedSearch]);
 
     const handleDeleteClick = (kafedra: Kafedra) => {
         setKafedraToDelete(kafedra);
@@ -96,10 +106,21 @@ const KafedraPage = () => {
                     <h1 className="text-3xl font-bold tracking-tight">Kafedras</h1>
                     <p className="text-muted-foreground">Manage university departments (kafedras)</p>
                 </div>
-                <Button onClick={() => { setSelectedKafedra(null); setIsModalOpen(true); }}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Kafedra
-                </Button>
+                <div className="flex gap-2">
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search kafedras..."
+                            className="pl-8 w-[250px]"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    <Button onClick={() => { setSelectedKafedra(null); setIsModalOpen(true); }}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Kafedra
+                    </Button>
+                </div>
             </div>
             <Card>
                 <CardHeader><CardTitle>All Kafedras</CardTitle></CardHeader>

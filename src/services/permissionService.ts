@@ -15,9 +15,9 @@ export interface PermissionListResponse {
 }
 
 export const permissionService = {
-    getPermissions: async (page = 1, limit = 100) => {
+    getPermissions: async (page = 1, limit = 100, name?: string) => {
         const response = await api.get<PermissionListResponse>('/permission/', {
-            params: { page, limit },
+            params: { page, limit, name },
         });
         return response.data;
     },

@@ -1,10 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { studentService, type StudentCreateRequest } from '@/services/studentService';
 
-export const useStudents = (page = 1, limit = 10) => {
+export const useStudents = (page = 1, limit = 10, full_name?: string) => {
     return useQuery({
-        queryKey: ['students', page, limit],
-        queryFn: () => studentService.getStudents(page, limit),
+        queryKey: ['students', page, limit, full_name],
+        queryFn: () => studentService.getStudents(page, limit, full_name),
         placeholderData: (previousData) => previousData,
     });
 };

@@ -14,7 +14,7 @@ import {
     TableRow,
 } from '@/components/ui/Table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Plus, Pencil, Trash2, Loader2, User as UserIcon } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, User as UserIcon, Search } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { useForm } from 'react-hook-form';
@@ -42,9 +42,19 @@ const TeachersPage = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [detailTeacher, setDetailTeacher] = useState<Teacher | null>(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const pageSize = 10;
 
-    const { data: teachersData, isLoading: isTeachersLoading } = useTeachers(currentPage, pageSize);
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setCurrentPage(1);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    const { data: teachersData, isLoading: isTeachersLoading } = useTeachers(currentPage, pageSize, debouncedSearch);
     const { data: kafedrasData } = useKafedras();
     const { data: usersData } = useUsers(1, 100);
     const deleteTeacherMutation = useDeleteTeacher();
@@ -89,10 +99,21 @@ const TeachersPage = () => {
                     <h1 className="text-3xl font-bold tracking-tight">Teachers</h1>
                     <p className="text-muted-foreground">Manage teacher records</p>
                 </div>
-                <Button onClick={() => { setSelectedTeacher(null); setIsModalOpen(true); }}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Teacher
-                </Button>
+                <div className="flex gap-2">
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search teachers..."
+                            className="pl-8 w-[250px]"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    <Button onClick={() => { setSelectedTeacher(null); setIsModalOpen(true); }}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Teacher
+                    </Button>
+                </div>
             </div>
 
             <Card>
@@ -122,8 +143,8 @@ const TeachersPage = () => {
                             </TableHeader>
                             <TableBody>
                                 {teachers.map((teacher) => (
-                                    <TableRow 
-                                        key={teacher.id} 
+                                    <TableRow
+                                        key={teacher.id}
                                         className="cursor-pointer hover:bg-muted/50"
                                         onClick={() => handleRowClick(teacher)}
                                     >

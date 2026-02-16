@@ -15,9 +15,9 @@ export interface FacultyListResponse {
 }
 
 export const facultyService = {
-    getFaculties: async (page = 1, limit = 100) => {
+    getFaculties: async (page = 1, limit = 100, name?: string) => {
         const response = await api.get<FacultyListResponse>('/faculty/', {
-            params: { page, limit },
+            params: { page, limit, name },
         });
         return response.data;
     },

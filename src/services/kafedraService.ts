@@ -16,9 +16,9 @@ export interface KafedraListResponse {
 }
 
 export const kafedraService = {
-    getKafedras: async (page = 1, limit = 100) => {
+    getKafedras: async (page = 1, limit = 100, name?: string) => {
         const response = await api.get<KafedraListResponse>('/kafedra/', {
-            params: { page, limit },
+            params: { page, limit, name },
         });
         return response.data;
     },

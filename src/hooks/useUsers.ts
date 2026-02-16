@@ -1,10 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { userService } from '@/services/userService';
 
-export const useUsers = (page = 1, limit = 10) => {
+export const useUsers = (page = 1, limit = 10, username?: string) => {
     return useQuery({
-        queryKey: ['users', page, limit],
-        queryFn: () => userService.getUsers(page, limit),
+        queryKey: ['users', page, limit, username],
+        queryFn: () => userService.getUsers(page, limit, username),
         placeholderData: (previousData) => previousData,
     });
 };

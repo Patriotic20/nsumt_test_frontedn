@@ -33,9 +33,9 @@ export interface QuestionListResponse {
 }
 
 export const questionService = {
-    getQuestions: async (page = 1, limit = 10) => {
+    getQuestions: async (page = 1, limit = 10, text?: string) => {
         const response = await api.get<QuestionListResponse>('/question/', {
-            params: { page, limit },
+            params: { page, limit, text },
         });
         return response.data;
     },

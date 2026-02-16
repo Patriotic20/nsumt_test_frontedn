@@ -1,10 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { resultService } from '@/services/resultService';
 
-export const useResults = (page = 1, limit = 10) => {
+export const useResults = (page = 1, limit = 10, userId?: number) => {
     return useQuery({
-        queryKey: ['results', page, limit],
-        queryFn: () => resultService.getResults(page, limit),
+        queryKey: ['results', page, limit, userId],
+        queryFn: () => userId
+            ? resultService.getUserResults(userId, page, limit)
+            : resultService.getResults(page, limit),
         placeholderData: (previousData) => previousData,
     });
 };
